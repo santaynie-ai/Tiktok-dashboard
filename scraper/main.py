@@ -32,17 +32,8 @@ class AcquisitionAIScraper:
         print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
 
     def send_notification(self, data):
-        if not all([self.wa_id, self.wa_token, self.wa_group]): return
-        msg = (f"🚀 *ACQUISITION AI: NEW LEAD!*\n\n"
-               f"👤 *{data['display_name']}* (@{data['username']})\n"
-               f"📂 *Kategori:* {data['category']}\n"
-               f"📊 *Followers:* {data['followers_count']:,}\n"
-               f"📞 *WA:* {data['phone_number'] or 'Tidak ada'}\n"
-               f"⚡ *Score:* {data['potential_score']}/100")
-        try:
-            requests.post(f"{self.wa_url}/waInstance{self.wa_id}/sendMessage/{self.wa_token}",
-                          json={"chatId": self.wa_group, "message": msg})
-        except: pass
+        # Disabled as per user request: only login/logout notifications should be sent
+        return
 
     async def extract_profile(self, context, username, category="General"):
         # Check if already exists to avoid redundant scraping

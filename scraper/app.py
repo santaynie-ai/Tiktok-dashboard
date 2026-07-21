@@ -19,16 +19,8 @@ class SyncScraper:
         self.wa_group = os.environ.get('WA_GROUP_ID')
 
     def send_notification(self, data):
-        if not all([self.wa_id, self.wa_token, self.wa_group]): return
-        msg = (f"🎯 *NEW LEAD FROM SEARCH!*\n\n"
-               f"👤 *{data['display_name']}* (@{data['username']})\n"
-               f"📊 *Followers:* {data['followers_count']:,}\n"
-               f"📞 *WA:* {data['phone_number'] or 'Tidak ada'}\n"
-               f"⚡ *Score:* {data['potential_score']}/100")
-        try:
-            requests.post(f"{self.wa_url}/waInstance{self.wa_id}/sendMessage/{self.wa_token}",
-                          json={"chatId": self.wa_group, "message": msg})
-        except: pass
+        # Disabled as per user request
+        return
 
     def scrape_and_save(self, page, username, category="Search Result"):
         try:

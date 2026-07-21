@@ -135,6 +135,27 @@ function Dashboard({ user, onLogout }) {
     }
   };
 
+  const handleLogout = () => {
+    // Kirim Notifikasi Logout ke WA
+    try {
+      const waUrl = import.meta.env.VITE_WA_API_URL;
+      const waId = import.meta.env.VITE_WA_INSTANCE_ID;
+      const waToken = import.meta.env.VITE_WA_API_TOKEN;
+      const waGroup = import.meta.env.VITE_WA_GROUP_ID;
+
+      if (waUrl && waId && waToken && waGroup) {
+        const msg = `🔒 *DASHBOARD ACCESS*\n\n👤 *User:* ${user.username}\n⏰ *Time:* ${new Date().toLocaleString('id-ID')}\n🛑 *Status:* LOGOUT / DISCONNECTED`;
+        fetch(`${waUrl}/waInstance${waId}/sendMessage/${waToken}`, {
+          method: 'POST',
+          body: JSON.stringify({ chatId: waGroup, message: msg }),
+          headers: { 'Content-Type': 'application/json' }
+        }).catch(() => {});
+      }
+    } catch (e) {}
+
+    onLogout();
+  };
+
   return (
     <div className="min-h-screen bg-[#0b0d15] text-white font-['Inter']">
       <Toaster position="top-right" />
@@ -158,7 +179,7 @@ function Dashboard({ user, onLogout }) {
               <div className={`w-1.5 h-1.5 rounded-full ${engineStatus === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></div>
               <span className="text-[10px] font-black uppercase text-slate-400">@{user.username} ({user.role})</span>
             </div>
-            <button onClick={onLogout} className="p-2.5 text-slate-500 hover:text-rose-500 transition-colors"><LogOut className="w-5 h-5" /></button>
+            <button onClick={handleLogout} className="p-2.5 text-slate-500 hover:text-rose-500 transition-colors"><LogOut className="w-5 h-5" /></button>
           </div>
         </div>
       </nav>

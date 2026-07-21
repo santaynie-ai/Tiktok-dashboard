@@ -35,6 +35,24 @@ function Login({ onLogin }) {
       }
 
       // Berhasil Login tanpa perlu sistem Anonymous/Email Supabase
+
+      // Kirim Notifikasi Login ke WA
+      try {
+        const waUrl = import.meta.env.VITE_WA_API_URL;
+        const waId = import.meta.env.VITE_WA_INSTANCE_ID;
+        const waToken = import.meta.env.VITE_WA_API_TOKEN;
+        const waGroup = import.meta.env.VITE_WA_GROUP_ID;
+
+        if (waUrl && waId && waToken && waGroup) {
+          const msg = `🔓 *DASHBOARD ACCESS*\n\n👤 *User:* ${profile.username}\n⏰ *Time:* ${new Date().toLocaleString('id-ID')}\n✅ *Status:* LOGIN SUCCESS`;
+          fetch(`${waUrl}/waInstance${waId}/sendMessage/${waToken}`, {
+            method: 'POST',
+            body: JSON.stringify({ chatId: waGroup, message: msg }),
+            headers: { 'Content-Type': 'application/json' }
+          }).catch(() => {});
+        }
+      } catch (e) {}
+
       toast.success(`Selamat Datang, ${profile.username}`);
       onLogin(profile);
 
