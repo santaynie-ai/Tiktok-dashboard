@@ -54,7 +54,15 @@ CREATE TABLE IF NOT EXISTS system_status (
     status TEXT
 );
 
--- 6. Akun Admin Default
+-- 6. Tabel Login Requests (Untuk 2FA/Approval Admin)
+CREATE TABLE IF NOT EXISTS login_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    username TEXT NOT NULL,
+    status TEXT DEFAULT 'pending', -- pending, approved, rejected
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 7. Akun Admin Default
 INSERT INTO profiles (username, password, role)
 VALUES ('admin', 'admin123', 'admin')
 ON CONFLICT (username) DO NOTHING;

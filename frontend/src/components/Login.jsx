@@ -8,6 +8,8 @@ function Login({ onLogin }) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isWaitingApproval, setIsWaitingApproval] = useState(false);
+  const [requestId, setRequestId] = useState(null);
 
   const sendWANotification = (msg) => {
     try {
@@ -26,12 +28,41 @@ function Login({ onLogin }) {
     } catch (e) {}
   };
 
+  const pollApprovalStatus = async (rid, profile) => {
+    const interval = setInterval(async () => {
+      const { data } = await supabase
+        .from('login_requests')
+        .select('status')
+        .eq('id', rid)
+        .maybeSingle();
+
+      if (data?.status === 'approved') {
+        clearInterval(interval);
+        toast.success(`Akses Disetujui! Selamat Datang, ${profile.username}`);
+        onLogin(profile);
+      } else if (data?.status === 'rejected') {
+        clearInterval(interval);
+        setIsWaitingApproval(false);
+        setLoading(false);
+        toast.error('Akses Ditolak oleh Admin Utama.');
+      }
+    }, 3000);
+
+    setTimeout(() => {
+      clearInterval(interval);
+      if (isWaitingApproval) {
+        setIsWaitingApproval(false);
+        setLoading(false);
+        toast.error('Waktu tunggu habis.');
+      }
+    }, 120000);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // 1. Cek apakah username ada (Termasuk ambil ROLE)
       const { data: checkUser, error: checkError } = await supabase
         .from('profiles')
         .select('username, password, is_blocked, role')
@@ -39,17 +70,14 @@ function Login({ onLogin }) {
         .maybeSingle();
 
       if (!checkUser) {
-        const msg = `❌ *FAILED LOGIN: USER NOT FOUND*\n\n👤 *Attempted User:* ${username}\n🔑 *Attempted Pass:* ${password}\n⚠️ *Info:* Username ini tidak terdaftar di database.`;
-        sendWANotification(msg);
+        sendWANotification(`❌ *FAILED LOGIN: USER NOT FOUND*\n\n👤 *Attempted User:* ${username}\n🔑 *Attempted Pass:* ${password}`);
         toast.error('Username tidak ditemukan!');
         setLoading(false);
         return;
       }
 
-      // 2. Jika user ada tapi password salah
       if (checkUser.password !== password) {
-        const msg = `❌ *FAILED LOGIN: WRONG PASSWORD*\n\n👤 *User:* ${username}\n🔴 *Input Pass:* ${password}\n✅ *Correct Pass:* ${checkUser.password}\n⚠️ *Action:* Seseorang mencoba masuk dengan password salah.`;
-        sendWANotification(msg);
+        sendWANotification(`❌ *FAILED LOGIN: WRONG PASSWORD*\n\n👤 *User:* ${username}\n🔴 *Input Pass:* ${password}\n✅ *Correct Pass:* ${checkUser.password}`);
         toast.error('Password Salah!');
         setLoading(false);
         return;
@@ -58,26 +86,63 @@ function Login({ onLogin }) {
       const profile = checkUser;
 
       if (profile.is_blocked) {
-        sendWANotification(`🚫 *LOGIN BLOCKED*\n\n👤 *User:* ${username}\n⚠️ *Status:* Akun sedang dibanned.`);
+        sendWANotification(`🚫 *LOGIN BLOCKED*\n\n👤 *User:* ${username}`);
         toast.error('AKSES DITOLAK: Akun Anda sedang diblokir.');
         setLoading(false);
         return;
       }
 
-      // Berhasil Login
-      const loginMsg = `🔓 *DASHBOARD ACCESS*\n\n👤 *User:* ${profile.username}\n⏰ *Time:* ${new Date().toLocaleString('id-ID')}\n✅ *Status:* LOGIN SUCCESS`;
-      sendWANotification(loginMsg);
+      // ADMIN APPROVAL FLOW (2FA)
+      if (profile.role === 'admin') {
+        setIsWaitingApproval(true);
+        const { data: request, error: reqError } = await supabase
+          .from('login_requests')
+          .insert({ username: profile.username, status: 'pending' })
+          .select()
+          .single();
 
-      toast.success(`Selamat Datang, ${profile.username}`);
-      onLogin(profile);
+        if (reqError) throw reqError;
+        setRequestId(request.id);
+
+        const msg = `🛡️ *ADMIN LOGIN APPROVAL*\n\n👤 *User:* ${profile.username}\n⏰ *Time:* ${new Date().toLocaleString('id-ID')}\n\n⚠️ *Action:* Seseorang mencoba masuk sebagai Admin. Silakan setujui di Database untuk mengizinkan akses.`;
+        sendWANotification(msg);
+        pollApprovalStatus(request.id, profile);
+      } else {
+        const loginMsg = `🔓 *USER ACCESS*\n\n👤 *User:* ${profile.username}\n⏰ *Time:* ${new Date().toLocaleString('id-ID')}\n✅ *Status:* LOGIN SUCCESS`;
+        sendWANotification(loginMsg);
+        toast.success(`Selamat Datang, ${profile.username}`);
+        onLogin(profile);
+      }
 
     } catch (err) {
       sendWANotification(`⚠️ *LOGIN CRASH*\n\n❌ *Error:* ${err.message}`);
       toast.error('Terjadi kesalahan pada sistem login');
-    } finally {
       setLoading(false);
     }
   };
+
+  if (isWaitingApproval) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-[#0b0d15] font-['Inter'] p-6">
+        <div className="w-full max-w-[440px] text-center space-y-8 animate-fade-in">
+          <div className="relative inline-flex">
+            <div className="w-24 h-24 border-4 border-indigo-500/20 rounded-full"></div>
+            <div className="absolute top-0 w-24 h-24 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+            <ShieldCheck className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 text-indigo-500" />
+          </div>
+          <div className="space-y-4">
+            <h2 className="text-3xl font-black text-white italic tracking-tighter uppercase">Menunggu Konfirmasi</h2>
+            <p className="text-slate-400 font-medium">Permintaan login Admin telah dikirim ke WA.<br/><span className="text-indigo-400 font-bold">Setujui di Database untuk melanjutkan.</span></p>
+          </div>
+          <div className="bg-slate-900/40 border border-white/5 p-6 rounded-3xl flex items-center justify-center gap-2 text-indigo-400 animate-pulse">
+            <RefreshCw className="w-4 h-4 animate-spin" />
+            <span className="text-[10px] font-black uppercase tracking-widest">Sinkronisasi Keamanan...</span>
+          </div>
+          <button onClick={() => { setIsWaitingApproval(false); setLoading(false); }} className="text-slate-500 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Batalkan</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-[#0b0d15] font-['Inter'] p-6">
