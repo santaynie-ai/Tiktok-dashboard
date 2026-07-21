@@ -37,6 +37,11 @@ class SyncScraper:
             display_name = page.inner_text('[data-e2e="user-title"]')
             bio = page.inner_text('[data-e2e="user-bio"]') if page.query_selector('[data-e2e="user-bio"]') else ""
 
+            # BIO CHECK: Must not be empty
+            if not bio.strip():
+                print(f"⏩ @{username} has empty bio, skipping...")
+                return False
+
             clean_bio = bio.replace(" ", "").replace("-", "")
             phone_match = re.search(r'(?:\+62|62|08)[0-9]{9,12}', clean_bio)
             phone = phone_match.group(0) if phone_match else None

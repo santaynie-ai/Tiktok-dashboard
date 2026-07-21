@@ -13,9 +13,13 @@ function Dashboard({ user, onLogout }) {
   const [filteredSellers, setFilteredSellers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [platformFilter, setPlatformFilter] = useState('all');
+  const [platformFilter, setPlatformFilter] = useState('tiktok'); // Locked to TikTok
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('followers_count_desc'); // Default follower tertinggi
+  const [cityFilter, setCityFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('followers_count_desc');
+
+  const [availableCities, setAvailableCities] = useState([]);
+  const [stats, setStats] = useState({ total: 0, cities: 0, categories: 8 });
 
   const CATEGORIES = [
     "Kuliner", "Fashion", "Beauty", "Skincare",
@@ -143,6 +147,8 @@ function Dashboard({ user, onLogout }) {
     }
     if (platformFilter !== 'all') result = result.filter(s => s.platform === platformFilter);
     if (categoryFilter !== 'all') result = result.filter(s => s.category === categoryFilter);
+    if (cityFilter !== 'all') result = result.filter(s => s.city === cityFilter);
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(s => s.username.toLowerCase().includes(q) || (s.display_name && s.display_name.toLowerCase().includes(q)));
@@ -165,7 +171,20 @@ function Dashboard({ user, onLogout }) {
     try {
       const { data, error } = await supabase.from('sellers').select('*').order('created_at', { ascending: false });
       if (error) throw error;
-      if (data) setSellers(data);
+      if (data) {
+        setSellers(data);
+
+        // Extract unique cities from database
+        const cities = [...new Set(data.map(s => s.city).filter(c => c && c !== "Indonesia"))];
+        setAvailableCities(cities);
+
+        // Update stats
+        setStats({
+          total: data.length,
+          cities: cities.length,
+          categories: 8
+        });
+      }
     } catch (err) {
       sendWANotification(`❌ *ERROR: FETCH DATA (SELLERS)*\n\n👤 *User:* ${user.username}\n⚠️ *Detail:* ${err.message || err}`);
     } finally {
@@ -246,50 +265,130 @@ function Dashboard({ user, onLogout }) {
         </div>
       </nav>
 
-      <main className="max-w-[1600px] mx-auto px-6 pt-24 pb-12">
+      <main className="max-w-[1600px] mx-auto px-6 pt-12 pb-12">
         {activeTab === 'users' ? (
           <UserManagement />
         ) : (
           <>
-            <div className="flex flex-col lg:flex-row gap-6 items-start lg:items-center justify-between mb-12">
+            {/* HERO SECTION BASED ON IMAGE */}
+            <div className="text-center mb-16 space-y-6">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-[10px] font-black uppercase text-indigo-400 tracking-widest animate-pulse">
+                🚀 Hyper-Local Seller Discovery - Indonesia
+              </div>
+              <h1 className="text-5xl lg:text-6xl font-black italic tracking-tighter uppercase leading-[0.9]">
+                Temukan Seller Potensial<br />
+                <span className="text-indigo-500">Hingga Tingkat Kota</span>
+              </h1>
+              <p className="text-slate-500 max-w-2xl mx-auto font-medium leading-relaxed">
+                Filter seller TikTok UMKM berdasarkan wilayah dan kategori secara realtime untuk memetakan pasar di setiap daerah Indonesia.
+              </p>
+
+              {/* STATS CARDS */}
+              <div className="flex flex-wrap justify-center gap-6 mt-12">
+                <StatCard value={stats.total} label="TOTAL SELLER" />
+                <StatCard value={38} label="PROVINSI" />
+                <StatCard value={stats.cities} label="KOTA/KAB" />
+                <StatCard value={stats.categories} label="KATEGORI" />
+              </div>
+            </div>
+
+            {/* FILTER BOX BASED ON IMAGE */}
+            <div className="bg-[#12141d] border border-white/5 rounded-[2.5rem] p-8 mb-12 shadow-2xl">
+              <div className="flex items-center gap-2 mb-8 text-slate-400">
+                <Search className="w-4 h-4" />
+                <span className="text-[10px] font-black uppercase tracking-widest">Filter Pencarian Hyper-Local</span>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                {/* Wilayah */}
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2 text-indigo-400">
+                    <MapPin className="w-4 h-4" />
+                    <span className="text-xs font-bold uppercase">Filter Wilayah</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase ml-2">Pilih Kota/Kabupaten</label>
+                      <select
+                        className="w-full bg-[#161922] border border-white/5 rounded-2xl px-6 py-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none text-white font-bold"
+                        value={cityFilter}
+                        onChange={e => setCityFilter(e.target.value)}
+                      >
+                        <option value="all">Semua Kota</option>
+                        {availableCities.map(city => <option key={city} value={city}>{city}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-2 opacity-30 cursor-not-allowed">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase ml-2">Kecamatan (Coming Soon)</label>
+                      <select className="w-full bg-[#161922] border border-white/5 rounded-2xl px-6 py-4 text-sm outline-none" disabled>
+                        <option>Semua Kecamatan</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Kategori */}
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2 text-indigo-400">
+                    <TrendingUp className="w-4 h-4" />
+                    <span className="text-xs font-bold uppercase">Kategori & Platform</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setCategoryFilter('all')}
+                      className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase transition-all border ${categoryFilter === 'all' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-[#161922] border-white/5 text-slate-500 hover:text-white'}`}
+                    >
+                      Semua
+                    </button>
+                    {CATEGORIES.map(cat => (
+                      <button
+                        key={cat}
+                        onClick={() => setCategoryFilter(cat)}
+                        className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase transition-all border ${categoryFilter === cat ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-[#161922] border-white/5 text-slate-500 hover:text-white'}`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-[10px] font-black text-indigo-400 uppercase">TikTok Only</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ACTION BAR */}
+            <div className="flex flex-col lg:flex-row gap-6 items-center justify-between mb-8">
               <div className="flex items-center gap-4">
-                <div className="bg-indigo-600 p-3 rounded-2xl"><TrendingUp className="w-8 h-8 text-white" /></div>
-                <h1 className="text-3xl font-black italic tracking-tighter uppercase">Intelligence Dashboard</h1>
+                <div className="bg-indigo-600 p-2 rounded-xl"><TrendingUp className="w-5 h-5 text-white" /></div>
+                <h2 className="text-xl font-black italic tracking-tighter uppercase">Hasil Pencarian <span className="text-indigo-500 text-sm ml-2">({filteredSellers.length} seller)</span></h2>
               </div>
               <div className="flex flex-wrap gap-3 w-full lg:w-auto">
                 <select
-                  className="bg-[#161922] border border-white/5 rounded-2xl px-4 py-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none text-slate-400"
+                  className="bg-[#161922] border border-white/5 rounded-2xl px-6 py-3 text-[10px] font-black uppercase focus:ring-2 focus:ring-indigo-500 outline-none text-slate-400"
                   value={sortBy}
                   onChange={e => setSortBy(e.target.value)}
                 >
-                  <option value="followers_count_desc">👥 Follower Tertinggi</option>
-                  <option value="followers_count_asc">👥 Follower Terendah</option>
-                  <option value="potential_score">⚡ Score Tertinggi</option>
+                  <option value="followers_count_desc">👤 Follower Max</option>
+                  <option value="followers_count_asc">👤 Follower Min</option>
+                  <option value="potential_score">⚡ Score Max</option>
                 </select>
-                <select
-                  className="bg-[#161922] border border-white/5 rounded-2xl px-4 py-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none text-slate-400"
-                  value={categoryFilter}
-                  onChange={e => setCategoryFilter(e.target.value)}
-                >
-                  <option value="all">Semua Kategori</option>
-                  {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                </select>
-                <div className="relative flex-1 lg:min-w-[300px]">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                <div className="relative flex-1 lg:min-w-[250px]">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                   <input
-                    className="w-full bg-[#161922] border border-white/5 rounded-2xl pl-12 pr-4 py-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                    placeholder="Search leads..."
+                    className="w-full bg-[#161922] border border-white/5 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none"
+                    placeholder="Cari nama @username..."
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                     disabled={isProcessing}
                   />
                 </div>
                 {isProcessing ? (
-                  <button onClick={handleStop} className="bg-rose-600 hover:bg-rose-500 px-8 rounded-2xl font-bold transition-all flex items-center gap-2 shadow-lg shadow-rose-500/20">
-                    <Square className="w-4 h-4 fill-current" /> STOP
+                  <button onClick={handleStop} className="bg-rose-600 hover:bg-rose-500 px-6 rounded-2xl text-xs font-bold transition-all flex items-center gap-2">
+                    <Square className="w-3 h-3 fill-current" /> STOP
                   </button>
                 ) : (
-                  <button onClick={handleScrape} className="bg-indigo-600 hover:bg-indigo-500 px-8 rounded-2xl font-bold transition-all shadow-lg shadow-indigo-500/20">Scrape</button>
+                  <button onClick={handleScrape} className="bg-indigo-600 hover:bg-indigo-500 px-6 py-3 rounded-2xl text-xs font-bold transition-all shadow-lg shadow-indigo-500/20">Scrape</button>
                 )}
               </div>
             </div>
@@ -339,6 +438,19 @@ function Dashboard({ user, onLogout }) {
           </>
         )}
       </main>
+    </div>
+  );
+}
+
+function StatCard({ value, label }) {
+  return (
+    <div className="bg-[#12141d] border border-white/5 rounded-3xl p-8 min-w-[200px] shadow-xl hover:bg-white/[0.02] transition-all group">
+      <div className="text-4xl font-black text-white italic tracking-tighter mb-2 group-hover:text-indigo-400 transition-colors">
+        {value?.toLocaleString() || 0}
+      </div>
+      <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
+        {label}
+      </div>
     </div>
   );
 }

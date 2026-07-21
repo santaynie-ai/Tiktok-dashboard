@@ -73,6 +73,13 @@ class AcquisitionAIScraper:
 
             display_name = await page.inner_text('[data-e2e="user-title"]')
             bio = await page.inner_text('[data-e2e="user-bio"]') if await page.query_selector('[data-e2e="user-bio"]') else ""
+
+            # BIO CHECK: Must not be empty
+            if not bio.strip():
+                self.log(f"⏩ Skipping @{username} (Empty Bio)")
+                await page.close()
+                return
+
             full_text = (display_name + " " + bio).lower()
 
             # 1. INDONESIA CHECK
