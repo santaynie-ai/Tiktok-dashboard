@@ -139,7 +139,7 @@ function Dashboard({ user, onLogout }) {
   useEffect(() => {
     let result = [...sellers];
 
-    // Safety check for user role
+    // Admin bypass: Admin sees all data regardless of platform status
     if (user?.role !== 'admin') {
       result = result.filter(s => {
         if (s.platform === 'tiktok' && !user?.can_view_tiktok) return false;
@@ -147,15 +147,12 @@ function Dashboard({ user, onLogout }) {
       });
     }
 
-    // Always filter by platform (TikTok Only as requested)
-    // result = result.filter(s => s.platform === 'tiktok' || !s.platform);
-
-    // Category Filter
+    // Category Filter: Show all if "all" is selected
     if (categoryFilter !== 'all') {
       result = result.filter(s => s.category === categoryFilter);
     }
 
-    // City Filter (Optional in results)
+    // City Filter: Show all if "all" is selected
     if (cityFilter !== 'all') {
       result = result.filter(s => s.city === cityFilter);
     }
@@ -169,7 +166,7 @@ function Dashboard({ user, onLogout }) {
       );
     }
 
-    // Sorting Logic
+    // Followers Sorting (Priority)
     if (sortBy === 'followers_count_desc') {
       result.sort((a, b) => (Number(b.followers_count) || 0) - (Number(a.followers_count) || 0));
     } else if (sortBy === 'followers_count_asc') {
@@ -178,10 +175,9 @@ function Dashboard({ user, onLogout }) {
       result.sort((a, b) => (Number(b.potential_score) || 0) - (Number(a.potential_score) || 0));
     }
 
-    console.log("Filtered Results:", result.length); // Debugging
     setFilteredSellers(result);
     setCurrentPage(1);
-  }, [searchQuery, platformFilter, sortBy, sellers, user, categoryFilter, cityFilter]);
+  }, [searchQuery, sortBy, sellers, user, categoryFilter, cityFilter]);
 
   const fetchSellers = async () => {
     try {
