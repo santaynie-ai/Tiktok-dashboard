@@ -138,34 +138,49 @@ function Dashboard({ user, onLogout }) {
 
   useEffect(() => {
     let result = [...sellers];
-    if (user.role !== 'admin') {
+
+    // Safety check for user role
+    if (user?.role !== 'admin') {
       result = result.filter(s => {
-        if (s.platform === 'tiktok' && !user.can_view_tiktok) return false;
-        if (s.platform === 'instagram' && !user.can_view_instagram) return false;
-        if (s.platform === 'twitter' && !user.can_view_twitter) return false;
+        if (s.platform === 'tiktok' && !user?.can_view_tiktok) return false;
         return true;
       });
     }
-    if (platformFilter !== 'all') result = result.filter(s => s.platform === platformFilter);
-    if (categoryFilter !== 'all') result = result.filter(s => s.category === categoryFilter);
-    if (cityFilter !== 'all') result = result.filter(s => s.city === cityFilter);
 
+    // Always filter by platform (TikTok Only as requested)
+    // result = result.filter(s => s.platform === 'tiktok' || !s.platform);
+
+    // Category Filter
+    if (categoryFilter !== 'all') {
+      result = result.filter(s => s.category === categoryFilter);
+    }
+
+    // City Filter (Optional in results)
+    if (cityFilter !== 'all') {
+      result = result.filter(s => s.city === cityFilter);
+    }
+
+    // Search Query
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      result = result.filter(s => s.username.toLowerCase().includes(q) || (s.display_name && s.display_name.toLowerCase().includes(q)));
+      result = result.filter(s =>
+        (s.username && s.username.toLowerCase().includes(q)) ||
+        (s.display_name && s.display_name.toLowerCase().includes(q))
+      );
     }
 
-    // Followers Sorting
+    // Sorting Logic
     if (sortBy === 'followers_count_desc') {
-      result.sort((a, b) => (b.followers_count || 0) - (a.followers_count || 0));
+      result.sort((a, b) => (Number(b.followers_count) || 0) - (Number(a.followers_count) || 0));
     } else if (sortBy === 'followers_count_asc') {
-      result.sort((a, b) => (a.followers_count || 0) - (b.followers_count || 0));
+      result.sort((a, b) => (Number(a.followers_count) || 0) - (Number(b.followers_count) || 0));
     } else {
-      result.sort((a, b) => (b[sortBy] || 0) - (a[sortBy] || 0));
+      result.sort((a, b) => (Number(b.potential_score) || 0) - (Number(a.potential_score) || 0));
     }
 
+    console.log("Filtered Results:", result.length); // Debugging
     setFilteredSellers(result);
-    setCurrentPage(1); // Reset ke halaman 1 saat filter berubah
+    setCurrentPage(1);
   }, [searchQuery, platformFilter, sortBy, sellers, user, categoryFilter, cityFilter]);
 
   const fetchSellers = async () => {
