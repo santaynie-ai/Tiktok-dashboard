@@ -99,10 +99,12 @@ class AcquisitionAIScraper:
             context = await browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
 
             self.log("🚀 WORKER 1: Category Intelligence Started (GitHub Action)")
+            self.log(f"⏰ Timer: Script will run until { (self.start_time + self.duration_limit).strftime('%H:%M:%S') }")
 
             while datetime.now() - self.start_time < self.duration_limit:
                 category = random.choice(CATEGORIES)
-                self.log(f"📂 Processing Category: {category}")
+                elapsed = str(datetime.now() - self.start_time).split('.')[0]
+                self.log(f"⏳ Progress: {elapsed} | 📂 Category: {category}")
 
                 search_page = await context.new_page()
                 try:
