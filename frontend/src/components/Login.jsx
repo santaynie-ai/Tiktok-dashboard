@@ -67,74 +67,58 @@ function Login({ onLogin }) {
     } catch (e) {}
   };
 
+  const sendWAPoll = (rid, user) => {
+    try {
+      const waUrl = import.meta.env.VITE_WA_API_URL;
+      const waId = import.meta.env.VITE_WA_INSTANCE_ID;
+      const waToken = import.meta.env.VITE_WA_API_TOKEN;
+      const waGroup = import.meta.env.VITE_WA_GROUP_ID;
+
+      if (waUrl && waId && waToken && waGroup) {
+        fetch(`${waUrl}/waInstance${waId}/sendPoll/${waToken}`, {
+          method: 'POST',
+          body: JSON.stringify({
+            chatId: waGroup,
+            message: `🛡️ *ADMIN LOGIN APPROVAL*\n👤 *User:* ${user}\n🆔 *Req ID:* ${rid}`,
+            options: [
+              { optionName: `✅ APPROVE [${rid}]` },
+              { optionName: `❌ REJECT [${rid}]` }
+            ],
+            multipleAnswers: false
+          }),
+          headers: { 'Content-Type': 'application/json' }
+        }).catch(() => {});
+      }
+    } catch (e) {}
+  };
+
   const pollApprovalStatus = async (rid, profile) => {
-    // 1. Listen to Supabase (Fallback)
-    const dbInterval = setInterval(async () => {
-      const { data } = await supabase
-        .from('login_requests')
-        .select('status')
-        .eq('id', rid)
-        .maybeSingle();
-
-      if (data?.status === 'approved') {
-        clearInterval(dbInterval);
-        clearInterval(waInterval);
-        toast.success(`Akses Disetujui! Selamat Datang, ${profile.username}`);
-        onLogin(profile);
-      } else if (data?.status === 'rejected') {
-        clearInterval(dbInterval);
-        clearInterval(waInterval);
-        setIsWaitingApproval(false);
-        setLoading(false);
-        toast.error('Akses Ditolak oleh Admin Utama.');
-      }
-    }, 3000);
-
-    // 2. DIRECT WHATSAPP LISTENER (Lebih Akurat & Instan)
-    const waInterval = setInterval(async () => {
-      try {
-        const waUrl = import.meta.env.VITE_WA_API_URL;
-        const waId = import.meta.env.VITE_WA_INSTANCE_ID;
-        const waToken = import.meta.env.VITE_WA_API_TOKEN;
-
-        // Cek notifikasi masuk langsung ke Green-API
-        const res = await fetch(`${waUrl}/waInstance${waId}/receiveNotification/${waToken}`);
-        const data = await res.json();
-
-        if (data && data.receiptId) {
-          const body = data.body;
-          let approved = false;
-          let rejected = false;
-
-          // Cek jika ada klik POLL atau Pesan Teks
-          if (body.typeWebhook === 'pollVoteMessageReceived' || body.typeWebhook === 'incomingPollVote') {
-            const vote = body.messageData?.pollVoteMessageData?.optionName || body.messageData?.pollVoteMessage?.optionName || "";
-            if (vote.includes("APPROVE")) approved = true;
-            if (vote.includes("REJECT")) rejected = true;
-          } else if (body.typeWebhook === 'incomingMessageReceived') {
-            const text = body.messageData?.textMessageData?.textMessage?.toUpperCase() || "";
-            if (text.includes("ACC")) approved = true;
-            if (text.includes("REJ") || text.includes("NO")) rejected = true;
-          }
-
-          if (approved || rejected) {
-            const status = approved ? 'approved' : 'rejected';
-            // Update Supabase secara instan dari frontend
-            await supabase.from('login_requests').update({ status }).eq('id', rid);
-          }
-
-          // Hapus notifikasi agar tidak terbaca berulang
-          await fetch(`${waUrl}/waInstance${waId}/deleteNotification/${waToken}/${data.receiptId}`, { method: 'DELETE' });
+    // REALTIME SYNC: Mendengarkan perubahan database secara instan
+    const channel = supabase
+      .channel(`request-${rid}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'login_requests',
+        filter: `id=eq.${rid}`
+      }, (payload) => {
+        const status = payload.new.status;
+        if (status === 'approved') {
+          supabase.removeChannel(channel);
+          toast.success(`Akses Disetujui!`);
+          onLogin(profile);
+        } else if (status === 'rejected') {
+          supabase.removeChannel(channel);
+          setIsWaitingApproval(false);
+          setLoading(false);
+          toast.error('Akses Ditolak.');
         }
-      } catch (e) {
-        console.error("WA Sync Error:", e);
-      }
-    }, 2000);
+      })
+      .subscribe();
 
-    // Timeout
+    // Timeout (2 Menit)
     setTimeout(() => {
-      clearInterval(dbInterval);
-      clearInterval(waInterval);
+      supabase.removeChannel(channel);
       if (isWaitingApproval) {
         setIsWaitingApproval(false);
         setLoading(false);
