@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AcquisitionAI | Admin Approval</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { background: #0b0d15; color: white; font-family: 'Inter', sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .card { background: #161922; padding: 2rem; border-radius: 2rem; border: 1px border-white/5; text-align: center; max-width: 400px; width: 90%; }
+        h1 { font-style: italic; font-weight: 900; letter-spacing: -1px; margin-bottom: 0.5rem; }
+        p { color: #94a3b8; font-size: 0.9rem; margin-bottom: 2rem; }
+        .btn { display: block; padding: 1rem; border-radius: 1rem; font-weight: bold; text-decoration: none; margin-bottom: 1rem; transition: all 0.3s; }
+        .approve { background: #4f46e5; color: white; }
+        .reject { background: #e11d48; color: white; }
+        .status { margin-top: 1rem; font-size: 0.8rem; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>SECURITY PORTAL</h1>
+        <p id="info">Memproses permintaan login Admin...</p>
+
+        <div id="actions" style="display: none;">
+            <a href="#" onclick="handle('approved')" class="btn approve">SETUJUI AKSES</a>
+            <a href="#" onclick="handle('rejected')" class="btn reject">TOLAK AKSES</a>
+        </div>
+
+        <div id="status" class="status"></div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const requestId = urlParams.get('id');
+        const user = urlParams.get('user');
+
+        // Config from your project
+        const supabaseUrl = 'https://rmyigajrfuffjlosbgdd.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJteWlnYWpyZnVmZmpsb3NiZ2RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0NTk1MzMsImV4cCI6MjEwMDAzNTUzM30.NBd0_TU-yilOsv5fa2aWZx7nri1WNC-l-xObG13adYQ';
+        const supabase = supabasejs.createClient(supabaseUrl, supabaseKey);
+
+        if (requestId) {
+            document.getElementById('info').innerHTML = `Permintaan login untuk: <b>@${user || 'Admin'}</b>`;
+            document.getElementById('actions').style.display = 'block';
+        } else {
+            document.getElementById('info').innerText = 'ID Permintaan tidak valid.';
+        }
+
+        async function handle(status) {
+            document.getElementById('actions').style.display = 'none';
+            document.getElementById('status').innerText = 'Mengirim Keputusan...';
+
+            const { error } = await supabase
+                .from('login_requests')
+                .update({ status: status })
+                .eq('id', requestId);
+
+            if (error) {
+                document.getElementById('status').style.color = '#e11d48';
+                document.getElementById('status').innerText = 'GAGAL: ' + error.message;
+            } else {
+                document.getElementById('status').style.color = '#10b981';
+                document.getElementById('status').innerText = status === 'approved' ? 'AKSES DISETUJUI! Perangkat sedang login...' : 'AKSES DITOLAK.';
+                setTimeout(() => window.close(), 3000);
+            }
+        }
+    </script>
+</body>
+</html>

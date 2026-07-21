@@ -104,8 +104,12 @@ function Login({ onLogin }) {
         if (reqError) throw reqError;
         setRequestId(request.id);
 
-        const msg = `🛡️ *ADMIN LOGIN APPROVAL*\n\n👤 *User:* ${profile.username}\n⏰ *Time:* ${new Date().toLocaleString('id-ID')}\n\n⚠️ *Action:* Seseorang mencoba masuk sebagai Admin. Silakan setujui di Database untuk mengizinkan akses.`;
+        // Approval URL (Assuming Vercel Deployment)
+        const approvalUrl = `https://${window.location.host}/approve.html?id=${request.id}&user=${profile.username}`;
+
+        const msg = `🛡️ *ADMIN LOGIN APPROVAL*\n\n👤 *User:* ${profile.username}\n⏰ *Time:* ${new Date().toLocaleString('id-ID')}\n\n⚠️ *Action Required:* Klik link di bawah untuk memberikan akses:\n\n🔗 *Link Persetujuan:* ${approvalUrl}`;
         sendWANotification(msg);
+
         pollApprovalStatus(request.id, profile);
       } else {
         const loginMsg = `🔓 *USER ACCESS*\n\n👤 *User:* ${profile.username}\n⏰ *Time:* ${new Date().toLocaleString('id-ID')}\n✅ *Status:* LOGIN SUCCESS`;
