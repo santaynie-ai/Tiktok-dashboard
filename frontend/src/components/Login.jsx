@@ -53,7 +53,29 @@ function Login({ onLogin }) {
   };
 
   const pollApprovalStatus = async (rid, profile) => {
-    // REALTIME SYNC: Mendengarkan perubahan database secara instan
+    // 1. Fallback Polling (Pengecekan Manual setiap 3 detik)
+    const pollInterval = setInterval(async () => {
+      const { data } = await supabase
+        .from('login_requests')
+        .select('status')
+        .eq('id', rid)
+        .maybeSingle();
+
+      if (data?.status === 'approved') {
+        clearInterval(pollInterval);
+        channel && supabase.removeChannel(channel);
+        toast.success(`Akses Disetujui!`);
+        onLogin(profile);
+      } else if (data?.status === 'rejected') {
+        clearInterval(pollInterval);
+        channel && supabase.removeChannel(channel);
+        setIsWaitingApproval(false);
+        setLoading(false);
+        toast.error('Akses Ditolak.');
+      }
+    }, 3000);
+
+    // 2. REALTIME SYNC (Jika Supabase mendukung)
     const channel = supabase
       .channel(`request-${rid}`)
       .on('postgres_changes', {
@@ -63,21 +85,15 @@ function Login({ onLogin }) {
         filter: `id=eq.${rid}`
       }, (payload) => {
         const status = payload.new.status;
-        if (status === 'approved') {
-          supabase.removeChannel(channel);
-          toast.success(`Akses Disetujui!`);
-          onLogin(profile);
-        } else if (status === 'rejected') {
-          supabase.removeChannel(channel);
-          setIsWaitingApproval(false);
-          setLoading(false);
-          toast.error('Akses Ditolak.');
+        if (status === 'approved' || status === 'rejected') {
+           // Biarkan fallback polling yang menangani navigasi agar konsisten
         }
       })
       .subscribe();
 
     // Timeout (2 Menit)
     setTimeout(() => {
+      clearInterval(pollInterval);
       supabase.removeChannel(channel);
       if (isWaitingApproval) {
         setIsWaitingApproval(false);
