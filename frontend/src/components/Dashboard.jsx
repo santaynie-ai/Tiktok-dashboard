@@ -250,7 +250,7 @@ function Dashboard({ user, onLogout }) {
               <span className="text-xl font-black tracking-tighter uppercase italic">AcquisitionAI</span>
             </div>
             <div className="hidden md:flex bg-white/5 p-1 rounded-2xl border border-white/5">
-              <button onClick={() => setActiveTab('data')} className={`px-6 py-2 rounded-xl text-xs font-black uppercase transition-all ${activeTab === 'data' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white'}`}>Data Dashboard</button>
+              <button onClick={() => { setActiveTab('data'); setShowResults(false); }} className={`px-6 py-2 rounded-xl text-xs font-black uppercase transition-all ${activeTab === 'data' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white'}`}>Data Dashboard</button>
               {user.role === 'admin' && (
                 <button onClick={() => setActiveTab('users')} className={`px-6 py-2 rounded-xl text-xs font-black uppercase transition-all ${activeTab === 'users' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white'}`}>Manage Users</button>
               )}
