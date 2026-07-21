@@ -175,8 +175,8 @@ function Dashboard({ user, onLogout }) {
       if (data) {
         setSellers(data);
 
-        // Extract unique cities from database
-        const cities = [...new Set(data.map(s => s.city).filter(c => c && c !== "Indonesia"))];
+        // Extract unique cities - always include Indonesia if it exists
+        const cities = [...new Set(data.map(s => s.city).filter(c => c && c.trim() !== ""))];
         setAvailableCities(cities);
 
         // Update stats
@@ -354,7 +354,13 @@ function Dashboard({ user, onLogout }) {
                   <div className="flex items-center justify-between gap-4">
                     <div className="px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-[10px] font-black text-indigo-400 uppercase">TikTok Only</div>
                     <button
-                      onClick={() => setShowResults(true)}
+                      onClick={() => {
+                        setShowResults(true);
+                        // Auto-scroll to results
+                        setTimeout(() => {
+                          window.scrollTo({ top: document.querySelector('.animate-fade-in-up')?.offsetTop - 100, behavior: 'smooth' });
+                        }, 100);
+                      }}
                       className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-black py-4 rounded-2xl transition-all shadow-xl shadow-indigo-600/20 uppercase text-xs tracking-widest"
                     >
                       Cari Seller Potensial
