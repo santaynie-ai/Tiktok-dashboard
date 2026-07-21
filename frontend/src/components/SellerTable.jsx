@@ -53,28 +53,17 @@ function SellerTable({ sellers, loading }) {
                           <span className="text-xl font-black italic tracking-tighter">@{seller.username}</span>
                           <CheckCircle2 className="w-4 h-4 text-emerald-500 fill-emerald-500/20" />
                           <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-500 text-[10px] font-black uppercase rounded-lg">Verified</span>
-                          {seller.is_viral && (
-                            <div className="bg-rose-500 p-1 rounded-lg shadow-lg shadow-rose-500/30 ml-1">
-                              <Flame className="w-3 h-3 text-white fill-current" />
-                            </div>
-                          )}
                         </div>
 
                         <div className="flex flex-wrap gap-2">
-                          {seller.is_trending && (
-                            <div className="px-3 py-1 bg-gradient-to-r from-orange-500 to-rose-600 rounded-lg flex items-center gap-1.5 shadow-lg shadow-rose-500/20">
-                              <TrendingUp className="w-3 h-3 text-white" />
-                              <span className="text-[10px] font-black uppercase text-white">Trending</span>
-                            </div>
-                          )}
                           <div className="px-3 py-1 bg-white/5 border border-white/5 rounded-lg flex items-center gap-1.5">
                             <Music2 className="w-3 h-3 text-slate-400" />
-                            <span className="text-[10px] font-black uppercase text-slate-400">TikTok</span>
+                            <span className="text-[10px] font-black uppercase text-slate-400">TikTok UMKM</span>
                           </div>
                         </div>
 
                         <div className="mt-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-relaxed">
-                          TikTok Platform · <span className="text-indigo-400">{seller.followers_count?.toLocaleString() || 0} followers</span> · ER: <span className="text-emerald-400">{seller.engagement_rate || 0}%</span>
+                          Indonesia · <span className="text-indigo-400">{seller.followers_count?.toLocaleString() || 0} followers</span>
                         </div>
                       </div>
                     </div>
@@ -102,7 +91,7 @@ function SellerTable({ sellers, loading }) {
 
                   <td className="px-8 py-10 align-top">
                     <div className="flex flex-col gap-1">
-                      <div className="text-sm font-black text-slate-300 italic uppercase tracking-tight">{seller.city || '-'}</div>
+                      <div className="text-sm font-black text-slate-300 italic uppercase tracking-tight">{seller.city || 'Indonesia'}</div>
                     </div>
                   </td>
 
@@ -122,8 +111,8 @@ function SellerTable({ sellers, loading }) {
                   </td>
 
                   <td className="px-8 py-10 align-top max-w-[300px]">
-                    <p className="text-xs font-medium text-slate-500 leading-relaxed italic">
-                      "{seller.potential_reason || 'No analysis available'}"
+                    <p className="text-xs font-medium text-slate-500 leading-relaxed italic line-clamp-3">
+                      {seller.bio || 'No Bio Available'}
                     </p>
                   </td>
                 </tr>
@@ -150,13 +139,10 @@ function SellerTable({ sellers, loading }) {
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-12">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-12">
                           <StatItem label="Followers" value={seller.followers_count?.toLocaleString()} />
-                          <StatItem label="Engagement" value={`${seller.engagement_rate}%`} color="text-emerald-500" />
                           <StatItem label="Potensi Score" value={`${seller.potential_score}/100`} color="text-indigo-400" />
-                          <StatItem label="Total Video" value={seller.video_count?.toLocaleString()} />
                           <StatItem label="Tgl Update" value={new Date(seller.last_scraped).toLocaleDateString()} />
-
                           <StatItem label="Kota/Kab" value={seller.city} color="text-amber-500" />
                         </div>
                       </div>
