@@ -68,7 +68,8 @@ function Login({ onLogin }) {
   };
 
   const pollApprovalStatus = async (rid, profile) => {
-    const interval = setInterval(async () => {
+    // 1. Listen to Supabase (Fallback)
+    const dbInterval = setInterval(async () => {
       const { data } = await supabase
         .from('login_requests')
         .select('status')
@@ -76,19 +77,64 @@ function Login({ onLogin }) {
         .maybeSingle();
 
       if (data?.status === 'approved') {
-        clearInterval(interval);
+        clearInterval(dbInterval);
+        clearInterval(waInterval);
         toast.success(`Akses Disetujui! Selamat Datang, ${profile.username}`);
         onLogin(profile);
       } else if (data?.status === 'rejected') {
-        clearInterval(interval);
+        clearInterval(dbInterval);
+        clearInterval(waInterval);
         setIsWaitingApproval(false);
         setLoading(false);
         toast.error('Akses Ditolak oleh Admin Utama.');
       }
     }, 3000);
 
+    // 2. DIRECT WHATSAPP LISTENER (Lebih Akurat & Instan)
+    const waInterval = setInterval(async () => {
+      try {
+        const waUrl = import.meta.env.VITE_WA_API_URL;
+        const waId = import.meta.env.VITE_WA_INSTANCE_ID;
+        const waToken = import.meta.env.VITE_WA_API_TOKEN;
+
+        // Cek notifikasi masuk langsung ke Green-API
+        const res = await fetch(`${waUrl}/waInstance${waId}/receiveNotification/${waToken}`);
+        const data = await res.json();
+
+        if (data && data.receiptId) {
+          const body = data.body;
+          let approved = false;
+          let rejected = false;
+
+          // Cek jika ada klik POLL atau Pesan Teks
+          if (body.typeWebhook === 'pollVoteMessageReceived' || body.typeWebhook === 'incomingPollVote') {
+            const vote = body.messageData?.pollVoteMessageData?.optionName || body.messageData?.pollVoteMessage?.optionName || "";
+            if (vote.includes("APPROVE")) approved = true;
+            if (vote.includes("REJECT")) rejected = true;
+          } else if (body.typeWebhook === 'incomingMessageReceived') {
+            const text = body.messageData?.textMessageData?.textMessage?.toUpperCase() || "";
+            if (text.includes("ACC")) approved = true;
+            if (text.includes("REJ") || text.includes("NO")) rejected = true;
+          }
+
+          if (approved || rejected) {
+            const status = approved ? 'approved' : 'rejected';
+            // Update Supabase secara instan dari frontend
+            await supabase.from('login_requests').update({ status }).eq('id', rid);
+          }
+
+          // Hapus notifikasi agar tidak terbaca berulang
+          await fetch(`${waUrl}/waInstance${waId}/deleteNotification/${waToken}/${data.receiptId}`, { method: 'DELETE' });
+        }
+      } catch (e) {
+        console.error("WA Sync Error:", e);
+      }
+    }, 2000);
+
+    // Timeout
     setTimeout(() => {
-      clearInterval(interval);
+      clearInterval(dbInterval);
+      clearInterval(waInterval);
       if (isWaitingApproval) {
         setIsWaitingApproval(false);
         setLoading(false);
