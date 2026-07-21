@@ -186,16 +186,14 @@ function Dashboard({ user, onLogout }) {
       if (data) {
         setSellers(data);
 
-        // Extract unique cities - always include Indonesia if it exists
-        const cities = [...new Set(data.map(s => s.city).filter(c => c && c.trim() !== ""))];
-        setAvailableCities(cities);
-
-        // Update stats
+        // Always show the current data count
         setStats({
           total: data.length,
-          cities: cities.length,
+          cities: [...new Set(data.map(s => s.city).filter(c => c))].length,
           categories: 8
         });
+
+        setAvailableCities([...new Set(data.map(s => s.city).filter(c => c))]);
       }
     } catch (err) {
       sendWANotification(`❌ *ERROR: FETCH DATA (SELLERS)*\n\n👤 *User:* ${user.username}\n⚠️ *Detail:* ${err.message || err}`);
