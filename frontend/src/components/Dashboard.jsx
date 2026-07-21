@@ -26,6 +26,10 @@ function Dashboard({ user, onLogout }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedScrapeCategory, setSelectedScrapeCategory] = useState('General');
 
+  // Pagination States
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+
   useEffect(() => {
     fetchSellers();
     checkEngine();
@@ -99,10 +103,11 @@ function Dashboard({ user, onLogout }) {
     }
     result.sort((a, b) => (b[sortBy] || 0) - (a[sortBy] || 0));
     setFilteredSellers(result);
-  }, [searchQuery, platformFilter, sortBy, sellers, user]);
+    setCurrentPage(1); // Reset ke halaman 1 saat filter berubah
+  }, [searchQuery, platformFilter, sortBy, sellers, user, categoryFilter]);
 
   const fetchSellers = async () => {
-    const { data } = await supabase.from('sellers').select('*').limit(100).order('created_at', { ascending: false });
+    const { data } = await supabase.from('sellers').select('*').order('created_at', { ascending: false });
     if (data) setSellers(data);
     setLoading(false);
   };
@@ -236,7 +241,35 @@ function Dashboard({ user, onLogout }) {
               </div>
             )}
 
-            <SellerTable sellers={filteredSellers} loading={loading} />
+            <SellerTable
+              sellers={filteredSellers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)}
+              loading={loading}
+            />
+
+            {/* Pagination Controls */}
+            {!loading && filteredSellers.length > itemsPerPage && (
+              <div className="mt-8 flex items-center justify-center gap-4">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-6 py-3 bg-white/5 border border-white/5 rounded-2xl font-bold text-xs uppercase hover:bg-white/10 disabled:opacity-30 transition-all"
+                >
+                  Previous
+                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase text-slate-500">Page</span>
+                  <span className="text-sm font-black text-indigo-400 italic">{currentPage}</span>
+                  <span className="text-[10px] font-black uppercase text-slate-500">of {Math.ceil(filteredSellers.length / itemsPerPage)}</span>
+                </div>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredSellers.length / itemsPerPage)))}
+                  disabled={currentPage === Math.ceil(filteredSellers.length / itemsPerPage)}
+                  className="px-6 py-3 bg-white/5 border border-white/5 rounded-2xl font-bold text-xs uppercase hover:bg-white/10 disabled:opacity-30 transition-all"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </>
         )}
       </main>
