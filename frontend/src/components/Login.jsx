@@ -31,10 +31,10 @@ function Login({ onLogin }) {
     setLoading(true);
 
     try {
-      // 1. Cek apakah username ada
+      // 1. Cek apakah username ada (Termasuk ambil ROLE)
       const { data: checkUser, error: checkError } = await supabase
         .from('profiles')
-        .select('username, password, is_blocked')
+        .select('username, password, is_blocked, role')
         .eq('username', username)
         .maybeSingle();
 
