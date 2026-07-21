@@ -167,7 +167,7 @@ function Dashboard({ user, onLogout }) {
       );
     }
 
-    // Followers Sorting (Best solution for discovery)
+    // Followers Sorting (Priority)
     if (sortBy === 'followers_count_desc') {
       result.sort((a, b) => (Number(b.followers_count) || 0) - (Number(a.followers_count) || 0));
     } else if (sortBy === 'followers_count_asc') {
