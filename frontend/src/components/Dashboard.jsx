@@ -187,8 +187,9 @@ function Dashboard({ user, onLogout }) {
   };
 
   const handleLogout = (reason = 'Manual Logout') => {
-    const status = reason.includes('Expired') ? '🔒 AUTO LOGOUT (15 MIN)' : '🔒 MANUAL LOGOUT';
-    const msg = `${status}\n\n👤 *User:* ${user.username}\n⏰ *Time:* ${new Date().toLocaleString('id-ID')}\n📝 *Reason:* ${reason}`;
+    const actualReason = typeof reason === 'string' ? reason : 'Manual Logout';
+    const status = actualReason.includes('Expired') ? '🔒 AUTO LOGOUT (15 MIN)' : '🔒 MANUAL LOGOUT';
+    const msg = `${status}\n\n👤 *User:* ${user.username}\n⏰ *Time:* ${new Date().toLocaleString('id-ID')}\n📝 *Reason:* ${actualReason}`;
     sendWANotification(msg);
     onLogout();
   };
