@@ -15,7 +15,7 @@ function Dashboard({ user, onLogout }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [platformFilter, setPlatformFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('potential_score');
+  const [sortBy, setSortBy] = useState('followers_count_desc'); // Default follower tertinggi
 
   const CATEGORIES = [
     "Kuliner", "Fashion", "Beauty", "Skincare",
@@ -29,6 +29,43 @@ function Dashboard({ user, onLogout }) {
   // Pagination States
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+
+  // Auto Logout Timer (15 Minutes)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      handleLogout('Session Expired (15 Minutes)');
+    }, 15 * 60 * 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Global Error Handler for WA
+  useEffect(() => {
+    const handleError = (event) => {
+      const errorMsg = event.error?.message || event.message || "Unknown Web Error";
+      sendWANotification(`⚠️ *WEB SYSTEM ERROR*\n\n👤 *User:* ${user.username}\n❌ *Error:* ${errorMsg}`);
+    };
+
+    window.addEventListener('error', handleError);
+    return () => window.removeEventListener('error', handleError);
+  }, [user]);
+
+  const sendWANotification = (msg) => {
+    try {
+      const waUrl = import.meta.env.VITE_WA_API_URL;
+      const waId = import.meta.env.VITE_WA_INSTANCE_ID;
+      const waToken = import.meta.env.VITE_WA_API_TOKEN;
+      const waGroup = import.meta.env.VITE_WA_GROUP_ID;
+
+      if (waUrl && waId && waToken && waGroup) {
+        fetch(`${waUrl}/waInstance${waId}/sendMessage/${waToken}`, {
+          method: 'POST',
+          body: JSON.stringify({ chatId: waGroup, message: msg }),
+          headers: { 'Content-Type': 'application/json' }
+        }).catch(() => {});
+      }
+    } catch (e) {}
+  };
 
   useEffect(() => {
     fetchSellers();
@@ -101,7 +138,16 @@ function Dashboard({ user, onLogout }) {
       const q = searchQuery.toLowerCase();
       result = result.filter(s => s.username.toLowerCase().includes(q) || (s.display_name && s.display_name.toLowerCase().includes(q)));
     }
-    result.sort((a, b) => (b[sortBy] || 0) - (a[sortBy] || 0));
+
+    // Followers Sorting
+    if (sortBy === 'followers_count_desc') {
+      result.sort((a, b) => (b.followers_count || 0) - (a.followers_count || 0));
+    } else if (sortBy === 'followers_count_asc') {
+      result.sort((a, b) => (a.followers_count || 0) - (b.followers_count || 0));
+    } else {
+      result.sort((a, b) => (b[sortBy] || 0) - (a[sortBy] || 0));
+    }
+
     setFilteredSellers(result);
     setCurrentPage(1); // Reset ke halaman 1 saat filter berubah
   }, [searchQuery, platformFilter, sortBy, sellers, user, categoryFilter]);
@@ -140,24 +186,10 @@ function Dashboard({ user, onLogout }) {
     }
   };
 
-  const handleLogout = () => {
-    // Kirim Notifikasi Logout ke WA
-    try {
-      const waUrl = import.meta.env.VITE_WA_API_URL;
-      const waId = import.meta.env.VITE_WA_INSTANCE_ID;
-      const waToken = import.meta.env.VITE_WA_API_TOKEN;
-      const waGroup = import.meta.env.VITE_WA_GROUP_ID;
-
-      if (waUrl && waId && waToken && waGroup) {
-        const msg = `🔒 *DASHBOARD ACCESS*\n\n👤 *User:* ${user.username}\n⏰ *Time:* ${new Date().toLocaleString('id-ID')}\n🛑 *Status:* LOGOUT / DISCONNECTED`;
-        fetch(`${waUrl}/waInstance${waId}/sendMessage/${waToken}`, {
-          method: 'POST',
-          body: JSON.stringify({ chatId: waGroup, message: msg }),
-          headers: { 'Content-Type': 'application/json' }
-        }).catch(() => {});
-      }
-    } catch (e) {}
-
+  const handleLogout = (reason = 'Manual Logout') => {
+    const status = reason.includes('Expired') ? '🔒 AUTO LOGOUT (15 MIN)' : '🔒 MANUAL LOGOUT';
+    const msg = `${status}\n\n👤 *User:* ${user.username}\n⏰ *Time:* ${new Date().toLocaleString('id-ID')}\n📝 *Reason:* ${reason}`;
+    sendWANotification(msg);
     onLogout();
   };
 
@@ -200,6 +232,15 @@ function Dashboard({ user, onLogout }) {
                 <h1 className="text-3xl font-black italic tracking-tighter uppercase">Intelligence Dashboard</h1>
               </div>
               <div className="flex flex-wrap gap-3 w-full lg:w-auto">
+                <select
+                  className="bg-[#161922] border border-white/5 rounded-2xl px-4 py-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none text-slate-400"
+                  value={sortBy}
+                  onChange={e => setSortBy(e.target.value)}
+                >
+                  <option value="followers_count_desc">👥 Follower Tertinggi</option>
+                  <option value="followers_count_asc">👥 Follower Terendah</option>
+                  <option value="potential_score">⚡ Score Tertinggi</option>
+                </select>
                 <select
                   className="bg-[#161922] border border-white/5 rounded-2xl px-4 py-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none text-slate-400"
                   value={categoryFilter}
