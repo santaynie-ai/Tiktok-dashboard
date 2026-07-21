@@ -1,9 +1,7 @@
 import os
-import threading
 import re
 import time
 import requests
-import gradio as gr
 import random
 from datetime import datetime
 from playwright.sync_api import sync_playwright
@@ -19,13 +17,9 @@ class SyncScraper:
         self.wa_token = os.environ.get('WA_API_TOKEN')
         self.wa_group = os.environ.get('WA_GROUP_ID')
 
-    def send_notification(self, data):
-        # Disabled as per user request
-        return
-
     def scrape_and_save(self, page, username, category="Search Result"):
         try:
-            # CHECK DUPLICATE FIRST
+            # CHECK DUPLICATE
             existing = SUPABASE.client.table('sellers').select('username').eq('username', username).execute()
             if existing.data:
                 print(f"⏩ @{username} exists, skipping...")
@@ -38,7 +32,6 @@ class SyncScraper:
             display_name = page.inner_text('[data-e2e="user-title"]')
             bio = page.inner_text('[data-e2e="user-bio"]') if page.query_selector('[data-e2e="user-bio"]') else ""
 
-            # BIO CHECK: Must not be empty
             if not bio.strip():
                 print(f"⏩ @{username} has empty bio, skipping...")
                 return False
@@ -66,9 +59,7 @@ class SyncScraper:
                 'category': category,
                 'city': "Indonesia",
                 'potential_score': int(min((followers / 5000) + (30 if phone else 0), 100)),
-                'potential_reason': f"Hasil pencarian manual untuk kriteria {category}.",
-                'engagement_rate': random.uniform(1.0, 10.0),
-                'video_count': random.randint(5, 200),
+                'potential_reason': "Hasil pencarian manual.",
                 'tiktok_url': url,
                 'last_scraped': datetime.now().isoformat()
             }
@@ -80,68 +71,50 @@ class SyncScraper:
             print(f"❌ Error @{username}: {str(e)[:30]}")
             return False
 
-def engine_worker():
-    print("🛠️ Installing System Dependencies...")
-    os.system("python -m playwright install chromium > /dev/null 2>&1")
-
+def run_local_search_worker():
     scraper = SyncScraper()
-
     with sync_playwright() as p:
-        try:
-            browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-dev-shm-usage'])
-            context = browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-            page = context.new_page()
+        # Local: Menampilkan browser agar bisa dipantau
+        browser = p.chromium.launch(headless=False)
+        context = browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        page = context.new_page()
 
-            print("🚀 WORKER 2: Search Intelligence LIVE (Render)")
+        print("🚀 LOCAL SEARCH WORKER: Monitoring Dashboard Queue...")
 
-            while True:
-                try:
-                    # Heartbeat
-                    SUPABASE.client.table('system_status').upsert({
-                        'id': 'search_engine', 'last_seen': datetime.now().isoformat(), 'status': 'online'
-                    }).execute()
+        while True:
+            try:
+                # Update Heartbeat
+                SUPABASE.client.table('system_status').upsert({'id': 'search_engine', 'last_seen': datetime.now().isoformat(), 'status': 'online'}).execute()
 
-                    # Antrean
-                    res = SUPABASE.client.table('search_queries').select('*').in_('status', ['pending', 'processing']).limit(1).execute()
+                # Cek Antrean dari Dashboard
+                res = SUPABASE.client.table('search_queries').select('*').eq('status', 'pending').limit(1).execute()
 
-                    if res.data:
-                        task = res.data[0]
-                        tid, query = task['id'], task['query']
+                if res.data:
+                    task = res.data[0]
+                    tid, query = task['id'], task['query']
+                    SUPABASE.client.table('search_queries').update({'status': 'processing'}).eq('id', tid).execute()
 
-                        if task['status'] == 'cancelled':
-                            SUPABASE.client.table('search_queries').update({'status': 'stopped'}).eq('id', tid).execute()
-                            continue
+                    print(f"🔎 Processing Search Query: {query}")
 
-                        SUPABASE.client.table('search_queries').update({'status': 'processing'}).eq('id', tid).execute()
-                        print(f"🔎 Scanning: {query}")
+                    if query.startswith('@'):
+                        scraper.scrape_and_save(page, query.replace('@', ''))
+                    else:
+                        page.goto(f"https://www.tiktok.com/search/user?q={query}")
+                        time.sleep(5)
+                        links = page.query_selector_all('a[href*="/@"]')
+                        for link in links[:10]:
+                            href = link.get_attribute('href')
+                            u = re.search(r'@([\w.]+)', href)
+                            if u: scraper.scrape_and_save(page, u.group(1))
+                            time.sleep(2)
 
-                        if query.startswith('@'):
-                            scraper.scrape_and_save(page, query.replace('@', ''))
-                        else:
-                            page.goto(f"https://www.tiktok.com/search/user?q={query}")
-                            time.sleep(5)
-                            links = page.query_selector_all('a[href*="/@"]')
-                            for i, link in enumerate(links[:10]):
-                                href = link.get_attribute('href')
-                                u = re.search(r'@([\w.]+)', href)
-                                if u: scraper.scrape_and_save(page, u.group(1))
-                                time.sleep(2)
+                    SUPABASE.client.table('search_queries').update({'status': 'completed'}).eq('id', tid).execute()
+                    print(f"🏁 Task {query} Finished.")
 
-                        SUPABASE.client.table('search_queries').update({'status': 'completed'}).eq('id', tid).execute()
-                except Exception as e:
-                    print(f"⚠️ Warning: {e}")
+            except Exception as e:
+                print(f"⚠️ Warning: {e}")
 
-                time.sleep(10)
-        except Exception as e:
-            print(f"❌ Fatal: {e}")
+            time.sleep(10)
 
 if __name__ == "__main__":
-    # Start worker in background
-    threading.Thread(target=engine_worker, daemon=True).start()
-
-    # Simple UI for Render to keep it alive
-    with gr.Blocks(title="AcquisitionAI Search Worker") as demo:
-        gr.Markdown("# 🔍 Worker 2: Search Intelligence")
-        gr.Markdown("This worker processes manual search queries from the dashboard.")
-
-    demo.launch(server_name="0.0.0.0", server_port=int(os.environ.get("PORT", 7860)))
+    run_local_search_worker()
