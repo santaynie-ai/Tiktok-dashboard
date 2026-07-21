@@ -11,45 +11,27 @@ function Login({ onLogin }) {
   const [isWaitingApproval, setIsWaitingApproval] = useState(false);
   const [requestId, setRequestId] = useState(null);
 
-  // AUTOMATIC CLOUD SYNC: Menghubungkan WA ke Vercel secara otomatis
+  // Konfigurasi otomatis sudah pindah ke Gmail
   useEffect(() => {
-    const syncWebhook = async () => {
-      try {
-        const waUrl = import.meta.env.VITE_WA_API_URL;
-        const waId = import.meta.env.VITE_WA_INSTANCE_ID;
-        const waToken = import.meta.env.VITE_WA_API_TOKEN;
-
-        if (waUrl && waId && waToken) {
-          const currentUrl = window.location.origin;
-          // Jangan sync jika di localhost
-          if (currentUrl.includes('localhost') || currentUrl.includes('127.0.0.1')) return;
-
-          const webhookUrl = `${currentUrl}/api/webhook`;
-
-          await fetch(`${waUrl}/waInstance${waId}/setSettings/${waToken}`, {
-            method: 'POST',
-            body: JSON.stringify({
-              webhookUrl: webhookUrl,
-              incomingWebhook: "yes",
-              stateInstanceWebhook: "yes"
-            }),
-            headers: { 'Content-Type': 'application/json' }
-          });
-          console.log("🚀 Automation Synced: WA connected to Cloud.");
-        }
-      } catch (e) {}
-    };
-    syncWebhook();
+    // Email system is self-contained. No setup needed.
   }, []);
 
   const sendApprovalEmail = async (rid, user) => {
     try {
-      await fetch('/api/send_email', {
+      const response = await fetch('/api/send_email', {
         method: 'POST',
         body: JSON.stringify({ id: rid, username: user }),
         headers: { 'Content-Type': 'application/json' }
       });
-    } catch (e) {}
+      const resData = await response.json();
+      if (!response.ok) {
+        toast.error(`Gagal mengirim email: ${resData.message || 'Cek koneksi'}`);
+      } else {
+        toast.success("Email persetujuan telah dikirim!");
+      }
+    } catch (e) {
+      toast.error("Terjadi kesalahan sistem saat mengirim email.");
+    }
   };
 
   const pollApprovalStatus = async (rid, profile) => {
