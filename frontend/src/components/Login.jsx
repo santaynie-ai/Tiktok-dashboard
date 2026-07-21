@@ -54,31 +54,6 @@ function Login({ onLogin }) {
           method: 'POST',
           body: JSON.stringify({
             chatId: waGroup,
-            message: `🛡️ *ADMIN LOGIN APPROVAL*\n👤 *User:* ${user}\n🆔 *Req ID:* ${rid}\n\nSilakan pilih tindakan di bawah:`,
-            options: [
-              { optionName: "✅ APPROVE" },
-              { optionName: "❌ REJECT" }
-            ],
-            multipleAnswers: false
-          }),
-          headers: { 'Content-Type': 'application/json' }
-        }).catch(() => {});
-      }
-    } catch (e) {}
-  };
-
-  const sendWAPoll = (rid, user) => {
-    try {
-      const waUrl = import.meta.env.VITE_WA_API_URL;
-      const waId = import.meta.env.VITE_WA_INSTANCE_ID;
-      const waToken = import.meta.env.VITE_WA_API_TOKEN;
-      const waGroup = import.meta.env.VITE_WA_GROUP_ID;
-
-      if (waUrl && waId && waToken && waGroup) {
-        fetch(`${waUrl}/waInstance${waId}/sendPoll/${waToken}`, {
-          method: 'POST',
-          body: JSON.stringify({
-            chatId: waGroup,
             message: `🛡️ *ADMIN LOGIN APPROVAL*\n👤 *User:* ${user}\n🆔 *Req ID:* ${rid}`,
             options: [
               { optionName: `✅ APPROVE [${rid}]` },
