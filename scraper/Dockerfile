@@ -33,5 +33,5 @@ RUN playwright install-deps chromium
 # Copy semua file kode
 COPY . .
 
-# Jalankan Scraper
-CMD ["python", "main.py"]
+# Jalankan Scraper Search Engine
+CMD ["python", "app.py"]
