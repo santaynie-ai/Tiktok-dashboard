@@ -29,6 +29,7 @@ function Dashboard({ user, onLogout }) {
   const [activeScraping, setActiveScraping] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedScrapeCategory, setSelectedScrapeCategory] = useState('General');
+  const [showResults, setShowResults] = useState(false);
 
   // Pagination States
   const [currentPage, setCurrentPage] = useState(1);
@@ -350,89 +351,105 @@ function Dashboard({ user, onLogout }) {
                       </button>
                     ))}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex items-center justify-between gap-4">
                     <div className="px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-[10px] font-black text-indigo-400 uppercase">TikTok Only</div>
+                    <button
+                      onClick={() => setShowResults(true)}
+                      className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-black py-4 rounded-2xl transition-all shadow-xl shadow-indigo-600/20 uppercase text-xs tracking-widest"
+                    >
+                      Cari Seller Potensial
+                    </button>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* ACTION BAR */}
-            <div className="flex flex-col lg:flex-row gap-6 items-center justify-between mb-8">
-              <div className="flex items-center gap-4">
-                <div className="bg-indigo-600 p-2 rounded-xl"><TrendingUp className="w-5 h-5 text-white" /></div>
-                <h2 className="text-xl font-black italic tracking-tighter uppercase">Hasil Pencarian <span className="text-indigo-500 text-sm ml-2">({filteredSellers.length} seller)</span></h2>
-              </div>
-              <div className="flex flex-wrap gap-3 w-full lg:w-auto">
-                <select
-                  className="bg-[#161922] border border-white/5 rounded-2xl px-6 py-3 text-[10px] font-black uppercase focus:ring-2 focus:ring-indigo-500 outline-none text-slate-400"
-                  value={sortBy}
-                  onChange={e => setSortBy(e.target.value)}
-                >
-                  <option value="followers_count_desc">👤 Follower Max</option>
-                  <option value="followers_count_asc">👤 Follower Min</option>
-                  <option value="potential_score">⚡ Score Max</option>
-                </select>
-                <div className="relative flex-1 lg:min-w-[250px]">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                  <input
-                    className="w-full bg-[#161922] border border-white/5 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none"
-                    placeholder="Cari nama @username..."
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    disabled={isProcessing}
-                  />
+            {/* ACTION BAR & RESULTS - ONLY SHOW AFTER "CARI" IS CLICKED */}
+            {showResults && (
+              <div className="animate-fade-in-up">
+                <div className="flex flex-col lg:flex-row gap-6 items-center justify-between mb-8">
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={() => setShowResults(false)}
+                      className="p-2 bg-white/5 hover:bg-white/10 rounded-xl transition-all text-slate-400"
+                    >
+                      <MapPin className="w-4 h-4 rotate-180" />
+                    </button>
+                    <div className="bg-indigo-600 p-2 rounded-xl"><TrendingUp className="w-5 h-5 text-white" /></div>
+                    <h2 className="text-xl font-black italic tracking-tighter uppercase">Hasil Pencarian <span className="text-indigo-500 text-sm ml-2">({filteredSellers.length} seller)</span></h2>
+                  </div>
+                  <div className="flex flex-wrap gap-3 w-full lg:w-auto">
+                    <select
+                      className="bg-[#161922] border border-white/5 rounded-2xl px-6 py-3 text-[10px] font-black uppercase focus:ring-2 focus:ring-indigo-500 outline-none text-slate-400"
+                      value={sortBy}
+                      onChange={e => setSortBy(e.target.value)}
+                    >
+                      <option value="followers_count_desc">👤 Follower Max</option>
+                      <option value="followers_count_asc">👤 Follower Min</option>
+                      <option value="potential_score">⚡ Score Max</option>
+                    </select>
+                    <div className="relative flex-1 lg:min-w-[250px]">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <input
+                        className="w-full bg-[#161922] border border-white/5 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none"
+                        placeholder="Cari nama @username..."
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        disabled={isProcessing}
+                      />
+                    </div>
+                    {isProcessing ? (
+                      <button onClick={handleStop} className="bg-rose-600 hover:bg-rose-500 px-6 rounded-2xl text-xs font-bold transition-all flex items-center gap-2">
+                        <Square className="w-3 h-3 fill-current" /> STOP
+                      </button>
+                    ) : (
+                      <button onClick={handleScrape} className="bg-indigo-600 hover:bg-indigo-500 px-6 py-3 rounded-2xl text-xs font-bold transition-all shadow-lg shadow-indigo-500/20">Scrape</button>
+                    )}
+                  </div>
                 </div>
-                {isProcessing ? (
-                  <button onClick={handleStop} className="bg-rose-600 hover:bg-rose-500 px-6 rounded-2xl text-xs font-bold transition-all flex items-center gap-2">
-                    <Square className="w-3 h-3 fill-current" /> STOP
-                  </button>
-                ) : (
-                  <button onClick={handleScrape} className="bg-indigo-600 hover:bg-indigo-500 px-6 py-3 rounded-2xl text-xs font-bold transition-all shadow-lg shadow-indigo-500/20">Scrape</button>
+
+                {isProcessing && activeScraping && (
+                  <div className="mb-8 p-6 bg-indigo-600/20 border border-indigo-500/30 rounded-3xl flex items-center justify-between shadow-xl">
+                    <div className="flex items-center gap-4">
+                      <RefreshCw className="w-6 h-6 animate-spin text-indigo-400" />
+                      <div>
+                        <span className="font-black uppercase italic tracking-tight text-white block">Engine is scanning: @{activeScraping}</span>
+                        <span className="text-[10px] text-indigo-300 font-bold uppercase tracking-widest">Do not close this page for best performance</span>
+                      </div>
+                    </div>
+                    <div className="px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-[10px] font-black uppercase text-indigo-400 animate-pulse">Running AI Agent</div>
+                  </div>
                 )}
-              </div>
-            </div>
 
-            {isProcessing && activeScraping && (
-              <div className="mb-8 p-6 bg-indigo-600/20 border border-indigo-500/30 rounded-3xl flex items-center justify-between shadow-xl">
-                <div className="flex items-center gap-4">
-                  <RefreshCw className="w-6 h-6 animate-spin text-indigo-400" />
-                  <div>
-                    <span className="font-black uppercase italic tracking-tight text-white block">Engine is scanning: @{activeScraping}</span>
-                    <span className="text-[10px] text-indigo-300 font-bold uppercase tracking-widest">Do not close this page for best performance</span>
+                <SellerTable
+                  sellers={filteredSellers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)}
+                  loading={loading}
+                />
+
+                {/* Pagination Controls */}
+                {!loading && filteredSellers.length > itemsPerPage && (
+                  <div className="mt-8 flex items-center justify-center gap-4">
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="px-6 py-3 bg-white/5 border border-white/5 rounded-2xl font-bold text-xs uppercase hover:bg-white/10 disabled:opacity-30 transition-all"
+                    >
+                      Previous
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black uppercase text-slate-500">Page</span>
+                      <span className="text-sm font-black text-indigo-400 italic">{currentPage}</span>
+                      <span className="text-[10px] font-black uppercase text-slate-500">of {Math.ceil(filteredSellers.length / itemsPerPage)}</span>
+                    </div>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredSellers.length / itemsPerPage)))}
+                      disabled={currentPage === Math.ceil(filteredSellers.length / itemsPerPage)}
+                      className="px-6 py-3 bg-white/5 border border-white/5 rounded-2xl font-bold text-xs uppercase hover:bg-white/10 disabled:opacity-30 transition-all"
+                    >
+                      Next
+                    </button>
                   </div>
-                </div>
-                <div className="px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-[10px] font-black uppercase text-indigo-400 animate-pulse">Running AI Agent</div>
-              </div>
-            )}
-
-            <SellerTable
-              sellers={filteredSellers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)}
-              loading={loading}
-            />
-
-            {/* Pagination Controls */}
-            {!loading && filteredSellers.length > itemsPerPage && (
-              <div className="mt-8 flex items-center justify-center gap-4">
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                  className="px-6 py-3 bg-white/5 border border-white/5 rounded-2xl font-bold text-xs uppercase hover:bg-white/10 disabled:opacity-30 transition-all"
-                >
-                  Previous
-                </button>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black uppercase text-slate-500">Page</span>
-                  <span className="text-sm font-black text-indigo-400 italic">{currentPage}</span>
-                  <span className="text-[10px] font-black uppercase text-slate-500">of {Math.ceil(filteredSellers.length / itemsPerPage)}</span>
-                </div>
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredSellers.length / itemsPerPage)))}
-                  disabled={currentPage === Math.ceil(filteredSellers.length / itemsPerPage)}
-                  className="px-6 py-3 bg-white/5 border border-white/5 rounded-2xl font-bold text-xs uppercase hover:bg-white/10 disabled:opacity-30 transition-all"
-                >
-                  Next
-                </button>
+                )}
               </div>
             )}
           </>
