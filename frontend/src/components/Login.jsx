@@ -11,7 +11,7 @@ function Login({ onLogin }) {
   const [isWaitingApproval, setIsWaitingApproval] = useState(false);
   const [requestId, setRequestId] = useState(null);
 
-  const sendWANotification = (msg) => {
+  const sendWAPoll = (rid, user) => {
     try {
       const waUrl = import.meta.env.VITE_WA_API_URL;
       const waId = import.meta.env.VITE_WA_INSTANCE_ID;
@@ -19,9 +19,17 @@ function Login({ onLogin }) {
       const waGroup = import.meta.env.VITE_WA_GROUP_ID;
 
       if (waUrl && waId && waToken && waGroup) {
-        fetch(`${waUrl}/waInstance${waId}/sendMessage/${waToken}`, {
+        fetch(`${waUrl}/waInstance${waId}/sendPoll/${waToken}`, {
           method: 'POST',
-          body: JSON.stringify({ chatId: waGroup, message: msg }),
+          body: JSON.stringify({
+            chatId: waGroup,
+            message: `🛡️ *ADMIN LOGIN APPROVAL*\n👤 *User:* ${user}\n🆔 *Req ID:* ${rid}\n\nSilakan pilih tindakan di bawah:`,
+            options: [
+              { optionName: "✅ APPROVE" },
+              { optionName: "❌ REJECT" }
+            ],
+            multipleAnswers: false
+          }),
           headers: { 'Content-Type': 'application/json' }
         }).catch(() => {});
       }
@@ -70,14 +78,12 @@ function Login({ onLogin }) {
         .maybeSingle();
 
       if (!checkUser) {
-        sendWANotification(`❌ *FAILED LOGIN: USER NOT FOUND*\n\n👤 *Attempted User:* ${username}\n🔑 *Attempted Pass:* ${password}`);
         toast.error('Username tidak ditemukan!');
         setLoading(false);
         return;
       }
 
       if (checkUser.password !== password) {
-        sendWANotification(`❌ *FAILED LOGIN: WRONG PASSWORD*\n\n👤 *User:* ${username}\n🔴 *Input Pass:* ${password}\n✅ *Correct Pass:* ${checkUser.password}`);
         toast.error('Password Salah!');
         setLoading(false);
         return;
@@ -86,7 +92,6 @@ function Login({ onLogin }) {
       const profile = checkUser;
 
       if (profile.is_blocked) {
-        sendWANotification(`🚫 *LOGIN BLOCKED*\n\n👤 *User:* ${username}`);
         toast.error('AKSES DITOLAK: Akun Anda sedang diblokir.');
         setLoading(false);
         return;
@@ -104,20 +109,16 @@ function Login({ onLogin }) {
         if (reqError) throw reqError;
         setRequestId(request.id);
 
-        // Approval Message for WA Reply
-        const msg = `🛡️ *ADMIN LOGIN APPROVAL*\n\n👤 *User:* ${profile.username}\n🆔 *ID:* ${request.id}\n⏰ *Time:* ${new Date().toLocaleString('id-ID')}\n\n⚠️ *Action Required:* Balas pesan ini dengan mengetik:\n\n*ACC ${request.id}* untuk Menyetujui\n*REJ ${request.id}* untuk Menolak`;
-        sendWANotification(msg);
+        // Send Poll instead of Message
+        sendWAPoll(request.id, profile.username);
 
         pollApprovalStatus(request.id, profile);
       } else {
-        const loginMsg = `🔓 *USER ACCESS*\n\n👤 *User:* ${profile.username}\n⏰ *Time:* ${new Date().toLocaleString('id-ID')}\n✅ *Status:* LOGIN SUCCESS`;
-        sendWANotification(loginMsg);
         toast.success(`Selamat Datang, ${profile.username}`);
         onLogin(profile);
       }
 
     } catch (err) {
-      sendWANotification(`⚠️ *LOGIN CRASH*\n\n❌ *Error:* ${err.message}`);
       toast.error('Terjadi kesalahan pada sistem login');
       setLoading(false);
     }
@@ -134,7 +135,10 @@ function Login({ onLogin }) {
           </div>
           <div className="space-y-4">
             <h2 className="text-3xl font-black text-white italic tracking-tighter uppercase">Menunggu Konfirmasi</h2>
-            <p className="text-slate-400 font-medium">Permintaan login Admin telah dikirim ke WA.<br/><span className="text-indigo-400 font-bold">Balas chat WA dengan ACC [ID] untuk menyetujui.</span></p>
+            <p className="text-slate-400 font-medium">Kami telah mengirimkan *Tombol Persetujuan* ke WhatsApp Admin.</p>
+            <div className="bg-indigo-500/10 border border-white/5 p-4 rounded-2xl">
+               <p className="text-indigo-400 text-xs font-black uppercase tracking-widest">Klik "APPROVE" pada Poll WhatsApp</p>
+            </div>
           </div>
           <div className="bg-slate-900/40 border border-white/5 p-6 rounded-3xl flex items-center justify-center gap-2 text-indigo-400 animate-pulse">
             <RefreshCw className="w-4 h-4 animate-spin" />
