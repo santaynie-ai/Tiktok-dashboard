@@ -8,7 +8,10 @@ import {
 import toast, { Toaster } from 'react-hot-toast';
 
 function Dashboard({ user, onLogout }) {
-  const [activeTab, setActiveTab] = useState('data');
+  // PERSISTENCE: Initialize states from localStorage to handle refresh
+  const [activeTab, setActiveTab] = useState(localStorage.getItem('dashboard_tab') || 'data');
+  const [showResults, setShowResults] = useState(localStorage.getItem('dashboard_show_results') === 'true');
+
   const [sellers, setSellers] = useState([]);
   const [filteredSellers, setFilteredSellers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -29,7 +32,15 @@ function Dashboard({ user, onLogout }) {
   const [activeScraping, setActiveScraping] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedScrapeCategory, setSelectedScrapeCategory] = useState('General');
-  const [showResults, setShowResults] = useState(false);
+
+  // PERSISTENCE: Sync states to localStorage
+  useEffect(() => {
+    localStorage.setItem('dashboard_tab', activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    localStorage.setItem('dashboard_show_results', showResults);
+  }, [showResults]);
 
   // Pagination States
   const [currentPage, setCurrentPage] = useState(1);
