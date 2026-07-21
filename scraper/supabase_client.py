@@ -1,4 +1,5 @@
 import os
+import sys
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
@@ -17,7 +18,11 @@ def init_supabase():
         key = os.environ.get('VITE_SUPABASE_ANON_KEY')
 
     if not url or not key:
-        raise ValueError("Missing Supabase credentials (SUPABASE_URL/VITE_SUPABASE_URL and SUPABASE_SERVICE_KEY/VITE_SUPABASE_ANON_KEY)")
+        print("CRITICAL ERROR: Missing Supabase credentials!")
+        print(f"URL found: {'Yes' if url else 'No'}")
+        print(f"Key found: {'Yes' if key else 'No'}")
+        print("Please check your GitHub Secrets or .env file.")
+        sys.exit(1)
 
     return create_client(url, key)
 
