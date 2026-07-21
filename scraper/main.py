@@ -53,12 +53,11 @@ class AcquisitionAIScraper:
             display_name = await page.inner_text('[data-e2e="user-title"]')
             bio = await page.inner_text('[data-e2e="user-bio"]') if await page.query_selector('[data-e2e="user-bio"]') else ""
 
-            # UMKM TARGETING: Check for Indonesian keywords in bio
-            indonesian_keywords = ['wa', '08', 'kecamatan', 'kabupaten', 'ongkir', 'cod', 'pesan', 'hubungi', 'indonesia', 'jakarta', 'bandung', 'surabaya']
-            is_indo = any(kw in bio.lower() for kw in indonesian_keywords) or any(kw in display_name.lower() for kw in indonesian_keywords)
-
-            if not is_indo:
-                self.log(f"⏩ Skipping @{username} (Not likely Indonesian UMKM)")
+            # UMKM TARGETING: Block profiles with foreign scripts (Chinese, Arabic, Japanese, etc.)
+            # This allows Latin characters (Indonesian/English) but blocks non-Latin languages
+            foreign_scripts = re.compile(r'[\u0600-\u06FF\u0750-\u077F\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF]')
+            if foreign_scripts.search(bio) or foreign_scripts.search(display_name):
+                self.log(f"⏩ Skipping @{username} (Contains foreign language script)")
                 await page.close()
                 return
 
