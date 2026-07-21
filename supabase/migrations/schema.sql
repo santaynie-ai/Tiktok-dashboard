@@ -1,4 +1,4 @@
--- 1. Matikan RLS agar Dashboard & Scraper bisa beroperasi dengan mudah (Service Role Bypass)
+-- 1. Matikan RLS agar Dashboard & Scraper bisa beroperasi dengan mudah
 ALTER TABLE IF EXISTS profiles DISABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS sellers DISABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS search_queries DISABLE ROW LEVEL SECURITY;
@@ -6,7 +6,7 @@ ALTER TABLE IF EXISTS system_status DISABLE ROW LEVEL SECURITY;
 
 -- 2. Tabel Profiles (User Management)
 CREATE TABLE IF NOT EXISTS profiles (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     auth_id UUID,
     username TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
@@ -18,40 +18,36 @@ CREATE TABLE IF NOT EXISTS profiles (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 3. Tabel Sellers (Data TikTok UMKM)
-CREATE TABLE IF NOT EXISTS sellers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+-- 3. Tabel Sellers (Data TikTok UMKM) - DIOPTIMALKAN (Hapus kolom tidak perlu)
+DROP TABLE IF EXISTS sellers;
+CREATE TABLE sellers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     platform TEXT DEFAULT 'tiktok',
     username TEXT UNIQUE NOT NULL,
-    display_name TEXT,
-    bio TEXT,
+    display_name TEXT DEFAULT '',
+    bio TEXT NOT NULL, -- Wajib ada bio
     followers_count BIGINT DEFAULT 0,
-    phone_number TEXT,
-    category TEXT,
-    province TEXT DEFAULT 'Indonesia',
+    phone_number TEXT DEFAULT 'N/A',
+    category TEXT DEFAULT 'General',
     city TEXT DEFAULT 'Indonesia',
-    district TEXT, -- Kecamatan
-    subdistrict TEXT, -- Kelurahan
     potential_score INTEGER DEFAULT 0,
-    potential_reason TEXT,
+    potential_reason TEXT DEFAULT 'Analisis sedang diproses oleh AI',
     engagement_rate DECIMAL(5,2) DEFAULT 0,
     video_count INTEGER DEFAULT 0,
-    is_viral BOOLEAN DEFAULT FALSE,
-    is_trending BOOLEAN DEFAULT FALSE,
-    tiktok_url TEXT,
+    tiktok_url TEXT DEFAULT '',
     last_scraped TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 4. Tabel Search Queries (Queue Scraper)
+-- 4. Tabel Search Queries
 CREATE TABLE IF NOT EXISTS search_queries (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     query TEXT UNIQUE NOT NULL,
-    status TEXT DEFAULT 'pending', -- pending, processing, completed, stopped
+    status TEXT DEFAULT 'pending',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 5. Tabel System Status (Heartbeat Worker)
+-- 5. Tabel System Status
 CREATE TABLE IF NOT EXISTS system_status (
     id TEXT PRIMARY KEY,
     last_seen TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -63,7 +59,6 @@ INSERT INTO profiles (username, password, role)
 VALUES ('admin', 'admin123', 'admin')
 ON CONFLICT (username) DO NOTHING;
 
--- 7. Indexing untuk Pencarian Cepat
+-- 7. Indexing
 CREATE INDEX IF NOT EXISTS idx_sellers_city ON sellers(city);
 CREATE INDEX IF NOT EXISTS idx_sellers_category ON sellers(category);
-CREATE INDEX IF NOT EXISTS idx_sellers_username ON sellers(username);

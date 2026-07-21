@@ -103,8 +103,6 @@ function SellerTable({ sellers, loading }) {
                   <td className="px-8 py-10 align-top">
                     <div className="flex flex-col gap-1">
                       <div className="text-sm font-black text-slate-300 italic uppercase tracking-tight">{seller.city || '-'}</div>
-                      {seller.district && <div className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">{seller.district}</div>}
-                      {seller.subdistrict && <div className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">{seller.subdistrict}</div>}
                     </div>
                   </td>
 
@@ -154,14 +152,12 @@ function SellerTable({ sellers, loading }) {
 
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-12">
                           <StatItem label="Followers" value={seller.followers_count?.toLocaleString()} />
-                          <StatItem label="Engagement Rate" value={`${seller.engagement_rate}%`} color="text-emerald-500" />
+                          <StatItem label="Engagement" value={`${seller.engagement_rate}%`} color="text-emerald-500" />
                           <StatItem label="Potensi Score" value={`${seller.potential_score}/100`} color="text-indigo-400" />
-                          <StatItem label="Video Count" value={seller.video_count?.toLocaleString()} />
-                          <StatItem label="Last Scraped" value={new Date(seller.last_scraped).toLocaleDateString()} />
+                          <StatItem label="Total Video" value={seller.video_count?.toLocaleString()} />
+                          <StatItem label="Tgl Update" value={new Date(seller.last_scraped).toLocaleDateString()} />
 
                           <StatItem label="Kota/Kab" value={seller.city} color="text-amber-500" />
-                          <StatItem label="Kecamatan" value={seller.district} color="text-amber-500" />
-                          <StatItem label="Kelurahan" value={seller.subdistrict} color="text-emerald-500" />
                         </div>
                       </div>
                     </td>
