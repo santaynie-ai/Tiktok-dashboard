@@ -1,8 +1,43 @@
+# Dependencies
 node_modules/
+vendor/
+Lib/
+lib/
+venv/
+.venv/
+env/
+ENV/
+
+# Build
 dist/
+build/
+out/
+
+# Environment
 .env
+.env.*
+!.env.example
+
+# Python
 *.pyc
 __pycache__/
-.DS_Store
-coverage/
+*.pyo
+*.pyd
+.python-version
+
+# Logs
 *.log
+logs/
+
+# Coverage
+coverage/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

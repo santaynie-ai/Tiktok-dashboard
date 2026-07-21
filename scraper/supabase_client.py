@@ -1,11 +1,24 @@
 import os
 from supabase import create_client, Client
+from dotenv import load_dotenv
+
+# Load environment variables for local development
+# This will load from frontend/.env or scraper/.env if they exist
+load_dotenv(os.path.join(os.path.dirname(__file__), '../frontend/.env'))
+load_dotenv()
 
 def init_supabase():
-    url = os.environ.get('SUPABASE_URL')
+    url = os.environ.get('SUPABASE_URL') or os.environ.get('VITE_SUPABASE_URL')
     key = os.environ.get('SUPABASE_SERVICE_KEY')
+
+    # Fallback to anon key for local testing if service key is not provided
+    # Note: RLS policies might need adjustment if using anon key for inserts
+    if not key:
+        key = os.environ.get('VITE_SUPABASE_ANON_KEY')
+
     if not url or not key:
-        raise ValueError("Missing Supabase credentials")
+        raise ValueError("Missing Supabase credentials (SUPABASE_URL/VITE_SUPABASE_URL and SUPABASE_SERVICE_KEY/VITE_SUPABASE_ANON_KEY)")
+
     return create_client(url, key)
 
 class SupabaseClient:

@@ -1,135 +1,224 @@
 import React, { useState, useEffect } from 'react';
 import SellerTable from './SellerTable';
+import UserManagement from './UserManagement';
 import { supabase } from '../lib/supabase';
-import { LogOut, TrendingUp, Users, Video, Heart, LayoutDashboard, RefreshCw } from 'lucide-react';
+import {
+  LogOut, TrendingUp, Users, RefreshCw, Search, Square
+} from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
-function Dashboard() {
+function Dashboard({ user, onLogout }) {
+  const [activeTab, setActiveTab] = useState('data');
   const [sellers, setSellers] = useState([]);
+  const [filteredSellers, setFilteredSellers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [stats, setStats] = useState({
-    total: 0,
-    viral: 0,
-    avgEngagement: 0,
-  });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [platformFilter, setPlatformFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('potential_score');
+
+  const CATEGORIES = [
+    "Kuliner", "Fashion", "Beauty", "Skincare",
+    "Gadget", "Elektronik", "Home Living", "Jasa"
+  ];
+  const [engineStatus, setEngineStatus] = useState('offline');
+  const [activeScraping, setActiveScraping] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedScrapeCategory, setSelectedScrapeCategory] = useState('General');
 
   useEffect(() => {
     fetchSellers();
+    checkEngine();
+    checkActiveTasks(); // Cek tugas aktif saat load/refresh
+    const interval = setInterval(() => {
+      checkEngine();
+      checkActiveTasks();
+    }, 15000);
+
+    const channel = supabase.channel('dashboard-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sellers' }, () => fetchSellers())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'search_queries' }, (p) => {
+        if (p.new.status === 'processing' || p.new.status === 'pending') {
+          setActiveScraping(p.new.query);
+          setIsProcessing(true);
+        } else {
+          setActiveScraping(null);
+          setIsProcessing(false);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
-  const fetchSellers = async () => {
-    setRefreshing(true);
+  const checkEngine = async () => {
     try {
-      const { data, error } = await supabase
-        .from('sellers')
-        .select('*')
-        .order('followers_count', { ascending: false });
-
-      if (error) throw error;
-
-      setSellers(data || []);
-
+      const { data } = await supabase.from('system_status').select('last_seen').eq('id', 'main_engine').single();
       if (data) {
-        const viral = data.filter(s => s.is_viral).length;
-        const avgEng = data.reduce((acc, s) => acc + (s.engagement_rate || 0), 0) / data.length || 0;
-        setStats({
-          total: data.length,
-          viral,
-          avgEngagement: avgEng,
-        });
+        const diff = (new Date() - new Date(data.last_seen)) / 1000;
+        setEngineStatus(diff < 60 ? 'online' : 'offline');
       }
-    } catch (error) {
-      toast.error('Failed to load sellers');
-      console.error(error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+    } catch (e) { setEngineStatus('offline'); }
+  };
+
+  const checkActiveTasks = async () => {
+    const { data } = await supabase
+      .from('search_queries')
+      .select('query, status')
+      .in('status', ['pending', 'processing'])
+      .limit(1)
+      .maybeSingle();
+
+    if (data) {
+      setActiveScraping(data.query);
+      setIsProcessing(true);
+    } else {
+      setActiveScraping(null);
+      setIsProcessing(false);
     }
   };
 
-  const handleLogout = async () => {
-    localStorage.removeItem('demo_mode'); // Hapus status demo
-    await supabase.auth.signOut();
-    window.location.reload();
+  useEffect(() => {
+    let result = [...sellers];
+    if (user.role !== 'admin') {
+      result = result.filter(s => {
+        if (s.platform === 'tiktok' && !user.can_view_tiktok) return false;
+        if (s.platform === 'instagram' && !user.can_view_instagram) return false;
+        if (s.platform === 'twitter' && !user.can_view_twitter) return false;
+        return true;
+      });
+    }
+    if (platformFilter !== 'all') result = result.filter(s => s.platform === platformFilter);
+    if (categoryFilter !== 'all') result = result.filter(s => s.category === categoryFilter);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(s => s.username.toLowerCase().includes(q) || (s.display_name && s.display_name.toLowerCase().includes(q)));
+    }
+    result.sort((a, b) => (b[sortBy] || 0) - (a[sortBy] || 0));
+    setFilteredSellers(result);
+  }, [searchQuery, platformFilter, sortBy, sellers, user]);
+
+  const fetchSellers = async () => {
+    const { data } = await supabase.from('sellers').select('*').limit(100).order('created_at', { ascending: false });
+    if (data) setSellers(data);
+    setLoading(false);
+  };
+
+  const handleScrape = async () => {
+    if (!searchQuery.trim()) {
+      toast.error('Masukkan kata kunci pencarian dahulu!');
+      return;
+    }
+    const clean = searchQuery.trim().replace('@', '');
+    const { error } = await supabase.from('search_queries').upsert({ query: clean, status: 'pending' }, { onConflict: 'query' });
+    if (!error) {
+      toast.success(`Task @${clean} dikirim ke Cloud`);
+      setIsProcessing(true);
+      setActiveScraping(clean);
+    }
+  };
+
+  const handleStop = async () => {
+    if (!activeScraping) return;
+    const { error } = await supabase
+      .from('search_queries')
+      .update({ status: 'cancelled' })
+      .eq('query', activeScraping);
+
+    if (!error) {
+      toast('Engine diberhentikan', { icon: '🛑' });
+      setIsProcessing(false);
+      setActiveScraping(null);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-12">
+    <div className="min-h-screen bg-[#0b0d15] text-white font-['Inter']">
       <Toaster position="top-right" />
 
-      {/* Navigation */}
-      <nav className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200 mb-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <div className="flex items-center gap-3">
-              <div className="bg-blue-600 p-2 rounded-lg shadow-lg shadow-blue-500/20">
-                <LayoutDashboard className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-700">
-                TikTok Dashboard
-              </span>
+      <nav className="border-b border-white/5 bg-[#0b0d15]/80 backdrop-blur-md sticky top-0 z-50">
+        <div className="max-w-[1600px] mx-auto px-6 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-8">
+            <div className="flex items-center gap-2">
+              <div className="bg-indigo-600 p-2 rounded-xl"><Users className="w-6 h-6 text-white" /></div>
+              <span className="text-xl font-black tracking-tighter uppercase italic">AcquisitionAI</span>
             </div>
-            <div className="flex items-center gap-4">
-              <button
-                onClick={fetchSellers}
-                disabled={refreshing}
-                className="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors disabled:opacity-50"
-                title="Refresh Data"
-              >
-                <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
-              </button>
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 rounded-xl transition-all duration-200"
-              >
-                <LogOut className="w-4 h-4" />
-                Logout
-              </button>
+            <div className="hidden md:flex bg-white/5 p-1 rounded-2xl border border-white/5">
+              <button onClick={() => setActiveTab('data')} className={`px-6 py-2 rounded-xl text-xs font-black uppercase transition-all ${activeTab === 'data' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white'}`}>Data Dashboard</button>
+              {user.role === 'admin' && (
+                <button onClick={() => setActiveTab('users')} className={`px-6 py-2 rounded-xl text-xs font-black uppercase transition-all ${activeTab === 'users' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white'}`}>Manage Users</button>
+              )}
             </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 border border-white/5 rounded-xl">
+              <div className={`w-1.5 h-1.5 rounded-full ${engineStatus === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></div>
+              <span className="text-[10px] font-black uppercase text-slate-400">@{user.username} ({user.role})</span>
+            </div>
+            <button onClick={onLogout} className="p-2.5 text-slate-500 hover:text-rose-500 transition-colors"><LogOut className="w-5 h-5" /></button>
           </div>
         </div>
       </nav>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 animate-fade-in">
-        {/* Header Section */}
-        <div className="mb-10">
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Seller Insights</h1>
-          <p className="text-slate-500 mt-1 font-medium text-lg">UMKM performance analytics and trend monitoring</p>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-          {[
-            { label: 'Total Sellers', value: stats.total, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', shadow: 'shadow-blue-500/10' },
-            { label: 'Viral Trends', value: stats.viral, icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50', shadow: 'shadow-emerald-500/10' },
-            { label: 'Avg Engagement', value: `${stats.avgEngagement.toFixed(2)}%`, icon: Heart, color: 'text-rose-600', bg: 'bg-rose-50', shadow: 'shadow-rose-500/10' },
-          ].map((stat, idx) => (
-            <div key={idx} className={`card hover:shadow-xl transition-shadow duration-300 border-none ring-1 ring-slate-200/60 ${stat.shadow}`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">{stat.label}</p>
-                  <p className="text-3xl font-bold text-slate-900 mt-1">{stat.value}</p>
+      <main className="max-w-[1600px] mx-auto px-6 pt-24 pb-12">
+        {activeTab === 'users' ? (
+          <UserManagement />
+        ) : (
+          <>
+            <div className="flex flex-col lg:flex-row gap-6 items-start lg:items-center justify-between mb-12">
+              <div className="flex items-center gap-4">
+                <div className="bg-indigo-600 p-3 rounded-2xl"><TrendingUp className="w-8 h-8 text-white" /></div>
+                <h1 className="text-3xl font-black italic tracking-tighter uppercase">Intelligence Dashboard</h1>
+              </div>
+              <div className="flex flex-wrap gap-3 w-full lg:w-auto">
+                <select
+                  className="bg-[#161922] border border-white/5 rounded-2xl px-4 py-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none text-slate-400"
+                  value={categoryFilter}
+                  onChange={e => setCategoryFilter(e.target.value)}
+                >
+                  <option value="all">Semua Kategori</option>
+                  {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                </select>
+                <div className="relative flex-1 lg:min-w-[300px]">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                  <input
+                    className="w-full bg-[#161922] border border-white/5 rounded-2xl pl-12 pr-4 py-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    placeholder="Search leads..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    disabled={isProcessing}
+                  />
                 </div>
-                <div className={`p-4 ${stat.bg} rounded-2xl`}>
-                  <stat.icon className={`w-7 h-7 ${stat.color}`} />
-                </div>
+                {isProcessing ? (
+                  <button onClick={handleStop} className="bg-rose-600 hover:bg-rose-500 px-8 rounded-2xl font-bold transition-all flex items-center gap-2 shadow-lg shadow-rose-500/20">
+                    <Square className="w-4 h-4 fill-current" /> STOP
+                  </button>
+                ) : (
+                  <button onClick={handleScrape} className="bg-indigo-600 hover:bg-indigo-500 px-8 rounded-2xl font-bold transition-all shadow-lg shadow-indigo-500/20">Scrape</button>
+                )}
               </div>
             </div>
-          ))}
-        </div>
 
-        {/* Main Content Area */}
-        <div className="card border-none ring-1 ring-slate-200/60 shadow-xl shadow-slate-200/20 overflow-hidden">
-          <div className="flex items-center justify-between mb-6 px-2">
-            <div>
-              <h2 className="text-xl font-bold text-slate-900">Leaderboard</h2>
-              <p className="text-sm font-medium text-slate-500 mt-1">Ranked by follower count and engagement</p>
-            </div>
-          </div>
-          <SellerTable sellers={sellers} loading={loading} />
-        </div>
-      </div>
+            {isProcessing && activeScraping && (
+              <div className="mb-8 p-6 bg-indigo-600/20 border border-indigo-500/30 rounded-3xl flex items-center justify-between shadow-xl">
+                <div className="flex items-center gap-4">
+                  <RefreshCw className="w-6 h-6 animate-spin text-indigo-400" />
+                  <div>
+                    <span className="font-black uppercase italic tracking-tight text-white block">Engine is scanning: @{activeScraping}</span>
+                    <span className="text-[10px] text-indigo-300 font-bold uppercase tracking-widest">Do not close this page for best performance</span>
+                  </div>
+                </div>
+                <div className="px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-[10px] font-black uppercase text-indigo-400 animate-pulse">Running AI Agent</div>
+              </div>
+            )}
+
+            <SellerTable sellers={filteredSellers} loading={loading} />
+          </>
+        )}
+      </main>
     </div>
   );
 }

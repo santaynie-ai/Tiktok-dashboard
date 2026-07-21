@@ -4,43 +4,36 @@ import Dashboard from './components/Dashboard';
 import { supabase } from './lib/supabase';
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    checkAuth();
+    const savedUser = localStorage.getItem('app_user');
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
+    }
+    setLoading(false);
   }, []);
 
-  const checkAuth = async () => {
-    try {
-      // Cek apakah sedang dalam mode demo
-      const isDemo = localStorage.getItem('demo_mode') === 'true';
-      if (isDemo) {
-        setIsAuthenticated(true);
-        setLoading(false);
-        return;
-      }
-
-      const { data: { session } } = await supabase.auth.getSession();
-      setIsAuthenticated(!!session);
-    } catch (error) {
-      console.error('Auth error:', error);
-    } finally {
-      setLoading(false);
-    }
+  const handleLogin = (userData) => {
+    setUser(userData);
+    localStorage.setItem('app_user', JSON.stringify(userData));
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('app_user');
+  };
+
+  if (loading) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
-      {isAuthenticated ? <Dashboard /> : <Login onLogin={setIsAuthenticated} />}
+    <div className="min-h-screen bg-[#0b0d15]">
+      {user ? (
+        <Dashboard user={user} onLogout={handleLogout} />
+      ) : (
+        <Login onLogin={handleLogin} />
+      )}
     </div>
   );
 }

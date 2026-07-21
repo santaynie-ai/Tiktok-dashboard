@@ -1,137 +1,145 @@
 import asyncio
 import os
 import random
-from datetime import datetime
+import re
+import requests
+import time
+import sys
+from datetime import datetime, timedelta
 from playwright.async_api import async_playwright
 from supabase_client import SupabaseClient
-import re
+from dotenv import load_dotenv
 
-class TikTokScraper:
+load_dotenv(os.path.join(os.path.dirname(__file__), '../frontend/.env'))
+
+CATEGORIES = [
+    "Kuliner", "Fashion", "Beauty", "Skincare",
+    "Gadget", "Elektronik", "Home Living", "Jasa"
+]
+
+class AcquisitionAIScraper:
     def __init__(self):
         self.supabase = SupabaseClient()
-        self.target_usernames = [
-            # Add some sample UMKM accounts (replace with real ones)
-            'fashionumkm', 'kulinerlokal', 'craftindonesia',
-            'batikindonesia', 'tenunindonesia', 'kopilokal',
-            'snacksehat', 'skincareherbal', 'furniturekayu'
-        ]
+        self.user_data_dir = "/tmp/tiktok_data" if os.name != 'nt' else os.path.join(os.path.dirname(__file__), "user_data")
+        self.wa_url = os.environ.get('WA_API_URL')
+        self.wa_id = os.environ.get('WA_INSTANCE_ID')
+        self.wa_token = os.environ.get('WA_API_TOKEN')
+        self.wa_group = os.environ.get('WA_GROUP_ID')
+        self.start_time = datetime.now()
+        self.duration_limit = timedelta(hours=5, minutes=30)
 
-    async def scrape_user(self, page, username):
+    def log(self, msg):
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+
+    def send_notification(self, data):
+        if not all([self.wa_id, self.wa_token, self.wa_group]): return
+        msg = (f"🚀 *ACQUISITION AI: NEW LEAD!*\n\n"
+               f"👤 *{data['display_name']}* (@{data['username']})\n"
+               f"📂 *Kategori:* {data['category']}\n"
+               f"📊 *Followers:* {data['followers_count']:,}\n"
+               f"📞 *WA:* {data['phone_number'] or 'Tidak ada'}\n"
+               f"⚡ *Score:* {data['potential_score']}/100")
         try:
-            url = f"https://www.tiktok.com/@{username}"
-            await page.goto(url, wait_until='networkidle')
+            requests.post(f"{self.wa_url}/waInstance{self.wa_id}/sendMessage/{self.wa_token}",
+                          json={"chatId": self.wa_group, "message": msg})
+        except: pass
 
-            # Wait for content to load
-            await page.wait_for_selector('h1[data-e2e="user-title"]', timeout=10000)
+    async def extract_profile(self, context, username, category="General"):
+        # Check if already exists to avoid redundant scraping
+        existing = self.supabase.client.table('sellers').select('username').eq('username', username).execute()
+        if existing.data:
+            self.log(f"⏩ Skipping @{username} (Already exists)")
+            return
 
-            # Get user info
-            display_name = await page.text_content('h1[data-e2e="user-title"]')
+        page = await context.new_page()
+        await page.set_extra_http_headers({"Accept-Language": "en-US,en;q=0.9"})
 
-            # Get follower count
-            follower_elem = await page.query_selector('[data-e2e="followers-count"]')
-            follower_text = await follower_elem.text_content() if follower_elem else '0'
-            followers = self.parse_count(follower_text)
+        try:
+            self.log(f"🕵️  Scanning profile: @{username} [{category}]")
+            await page.goto(f"https://www.tiktok.com/@{username}", wait_until="domcontentloaded", timeout=60000)
+            await page.wait_for_selector('[data-e2e="user-title"]', timeout=15000)
 
-            # Get following count
-            following_elem = await page.query_selector('[data-e2e="following-count"]')
-            following_text = await following_elem.text_content() if following_elem else '0'
-            following = self.parse_count(following_text)
+            display_name = await page.inner_text('[data-e2e="user-title"]')
+            bio = await page.inner_text('[data-e2e="user-bio"]') if await page.query_selector('[data-e2e="user-bio"]') else ""
 
-            # Get video count
-            video_elem = await page.query_selector('[data-e2e="video-count"]')
-            video_text = await video_elem.text_content() if video_elem else '0'
-            videos = self.parse_count(video_text)
+            phone_match = re.search(r'(?:\+62|62|08)[0-9]{9,12}', bio.replace(" ", "").replace("-", ""))
+            phone = phone_match.group(0) if phone_match else None
 
-            # Get likes count
-            likes_elem = await page.query_selector('[data-e2e="likes-count"]')
-            likes_text = await likes_elem.text_content() if likes_elem else '0'
-            likes = self.parse_count(likes_text)
+            followers_raw = await page.inner_text('[data-e2e="followers-count"]')
+            followers = self.parse_count(followers_raw)
 
-            # Get engagement rate (simplified)
-            engagement_rate = self.calculate_engagement(followers, likes, videos)
+            if followers < 100:
+                await page.close()
+                return
 
-            # Check if viral (simplified)
-            is_viral = followers > 10000 and engagement_rate > 5
-            viral_reason = None
-            if is_viral:
-                reasons = []
-                if followers > 10000:
-                    reasons.append("High follower count")
-                if engagement_rate > 5:
-                    reasons.append("High engagement rate")
-                if videos > 50:
-                    reasons.append("Active content creator")
-                viral_reason = " & ".join(reasons)
-
-            return {
+            data = {
+                'platform': 'tiktok',
                 'username': username,
-                'display_name': display_name or username,
-                'avatar_url': f"https://www.tiktok.com/@{username}/profile",
+                'display_name': display_name,
                 'followers_count': followers,
-                'following_count': following,
-                'video_count': videos,
-                'likes_count': likes,
-                'engagement_rate': engagement_rate,
-                'is_viral': is_viral,
-                'viral_reason': viral_reason,
-                'tiktok_url': url,
+                'phone_number': phone,
+                'category': category,
+                'city': "Indonesia",
+                'potential_score': int(min((followers / 1000) + (20 if phone else 0), 100)),
+                'tiktok_url': f"https://www.tiktok.com/@{username}",
                 'last_scraped': datetime.now().isoformat()
             }
 
+            self.supabase.insert_seller(data)
+            if phone: self.send_notification(data)
+            self.log(f"✅ Success: @{username} ({followers} followers)")
+
         except Exception as e:
-            print(f"Error scraping @{username}: {e}")
-            return None
+            self.log(f"❌ Error profiling @{username}: {str(e)[:50]}")
+        finally:
+            await page.close()
 
     def parse_count(self, text):
-        """Parse count from TikTok format (e.g., '1.5M', '100K')"""
         try:
-            text = text.strip().replace(',', '')
-            if 'M' in text:
-                return int(float(text.replace('M', '')) * 1000000)
-            elif 'K' in text:
-                return int(float(text.replace('K', '')) * 1000)
-            else:
-                return int(text) if text else 0
-        except:
-            return 0
+            text = text.upper()
+            if 'M' in text: return int(float(text.replace('M', '')) * 1000000)
+            if 'K' in text: return int(float(text.replace('K', '')) * 1000)
+            return int(''.join(filter(str.isdigit, text)) or 0)
+        except: return 0
 
-    def calculate_engagement(self, followers, likes, videos):
-        """Calculate engagement rate"""
-        if followers == 0:
-            return 0
-        # Simplified engagement calculation
-        total_engagement = likes + (videos * 100)  # assume average 100 likes per video
-        rate = (total_engagement / followers) * 100
-        return min(rate, 20)  # Cap at 20%
-
-    async def scrape_all(self):
+    async def run_category_worker(self):
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            context = await browser.new_context(
-                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            )
-            page = await context.new_page()
+            browser = await p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
+            context = await browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
 
-            for username in self.target_usernames:
-                print(f"Scraping @{username}...")
-                data = await self.scrape_user(page, username)
-                if data:
-                    result = self.supabase.insert_seller(data)
-                    if result:
-                        print(f"✅ Successfully saved @{username}")
-                    else:
-                        print(f"❌ Failed to save @{username}")
-                else:
-                    print(f"❌ Failed to scrape @{username}")
+            self.log("🚀 WORKER 1: Category Intelligence Started (GitHub Action)")
 
-                # Random delay to avoid detection
-                await asyncio.sleep(random.uniform(3, 8))
+            while datetime.now() - self.start_time < self.duration_limit:
+                category = random.choice(CATEGORIES)
+                self.log(f"📂 Processing Category: {category}")
 
+                search_page = await context.new_page()
+                try:
+                    await search_page.goto(f"https://www.tiktok.com/search/user?q={category}")
+                    await asyncio.sleep(10)
+
+                    user_links = await search_page.query_selector_all('a[href*="/@"]')
+                    usernames = []
+                    for link in user_links[:15]:
+                        href = await link.get_attribute('href')
+                        u = re.search(r'@([\w.]+)', href)
+                        if u: usernames.append(u.group(1))
+
+                    await search_page.close()
+
+                    for u in list(set(usernames)):
+                        if datetime.now() - self.start_time > self.duration_limit: break
+                        await self.extract_profile(context, u, category)
+                        await asyncio.sleep(random.uniform(5, 10))
+                except Exception as e:
+                    self.log(f"⚠️ Search Error: {e}")
+                    if not search_page.is_closed(): await search_page.close()
+
+                await asyncio.sleep(30) # Cool down between category jumps
+
+            self.log("⏰ Duration reached. Stopping worker.")
             await browser.close()
 
-async def main():
-    scraper = TikTokScraper()
-    await scraper.scrape_all()
-
 if __name__ == "__main__":
-    asyncio.run(main())
+    scraper = AcquisitionAIScraper()
+    asyncio.run(scraper.run_category_worker())
