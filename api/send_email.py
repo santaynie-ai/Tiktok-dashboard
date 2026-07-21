@@ -7,8 +7,8 @@ from http.server import BaseHTTPRequestHandler
 
 def send_approval_email(request_id, username, target_email):
     # Mengambil kredensial dari environment variables
-    sender_email = os.environ.get('email_tiktok')
-    sender_password = os.environ.get('email_password')
+    sender_email = os.environ.get('EMAIL_TIKTOK')
+    sender_password = os.environ.get('EMAIL_PASSWORD')
 
     if not sender_email or not sender_password:
         print("❌ Error: Email credentials not found in environment.")
