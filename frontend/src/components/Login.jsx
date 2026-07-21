@@ -42,28 +42,13 @@ function Login({ onLogin }) {
     syncWebhook();
   }, []);
 
-  const sendWAPoll = (rid, user) => {
+  const sendApprovalEmail = async (rid, user) => {
     try {
-      const waUrl = import.meta.env.VITE_WA_API_URL;
-      const waId = import.meta.env.VITE_WA_INSTANCE_ID;
-      const waToken = import.meta.env.VITE_WA_API_TOKEN;
-      const waGroup = import.meta.env.VITE_WA_GROUP_ID;
-
-      if (waUrl && waId && waToken && waGroup) {
-        fetch(`${waUrl}/waInstance${waId}/sendPoll/${waToken}`, {
-          method: 'POST',
-          body: JSON.stringify({
-            chatId: waGroup,
-            message: `🛡️ *ADMIN LOGIN APPROVAL*\n👤 *User:* ${user}\n🆔 *Req ID:* ${rid}`,
-            options: [
-              { optionName: `✅ APPROVE [${rid}]` },
-              { optionName: `❌ REJECT [${rid}]` }
-            ],
-            multipleAnswers: false
-          }),
-          headers: { 'Content-Type': 'application/json' }
-        }).catch(() => {});
-      }
+      await fetch('/api/send_email', {
+        method: 'POST',
+        body: JSON.stringify({ id: rid, username: user }),
+        headers: { 'Content-Type': 'application/json' }
+      });
     } catch (e) {}
   };
 
@@ -133,7 +118,7 @@ function Login({ onLogin }) {
         return;
       }
 
-      // ADMIN APPROVAL FLOW (2FA)
+      // ADMIN APPROVAL FLOW (GMAIL)
       if (profile.role === 'admin') {
         setIsWaitingApproval(true);
         const { data: request, error: reqError } = await supabase
@@ -145,8 +130,8 @@ function Login({ onLogin }) {
         if (reqError) throw reqError;
         setRequestId(request.id);
 
-        // Send Poll instead of Message
-        sendWAPoll(request.id, profile.username);
+        // Kirim Email Persetujuan
+        sendApprovalEmail(request.id, profile.username);
 
         pollApprovalStatus(request.id, profile);
       } else {
@@ -170,15 +155,15 @@ function Login({ onLogin }) {
             <ShieldCheck className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 text-indigo-500" />
           </div>
           <div className="space-y-4">
-            <h2 className="text-3xl font-black text-white italic tracking-tighter uppercase">Menunggu Konfirmasi</h2>
-            <p className="text-slate-400 font-medium">Kami telah mengirimkan *Tombol Persetujuan* ke WhatsApp Admin.</p>
-            <div className="bg-indigo-500/10 border border-white/5 p-4 rounded-2xl">
-               <p className="text-indigo-400 text-xs font-black uppercase tracking-widest">Klik "APPROVE" pada Poll WhatsApp</p>
+            <h2 className="text-3xl font-black text-white italic tracking-tighter uppercase">Verifikasi Email</h2>
+            <p className="text-slate-400 font-medium italic">Permintaan login telah dikirim ke Gmail Anda.</p>
+            <div className="bg-indigo-500/10 border border-indigo-500/20 p-4 rounded-2xl">
+               <p className="text-indigo-400 text-xs font-black uppercase tracking-widest">Klik "SETUJUI" pada Email dari Admin</p>
             </div>
           </div>
           <div className="bg-slate-900/40 border border-white/5 p-6 rounded-3xl flex items-center justify-center gap-2 text-indigo-400 animate-pulse">
             <RefreshCw className="w-4 h-4 animate-spin" />
-            <span className="text-[10px] font-black uppercase tracking-widest">Sinkronisasi Keamanan...</span>
+            <span className="text-[10px] font-black uppercase tracking-widest">Menunggu Konfirmasi Gmail...</span>
           </div>
           <button onClick={() => { setIsWaitingApproval(false); setLoading(false); }} className="text-slate-500 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Batalkan</button>
         </div>
