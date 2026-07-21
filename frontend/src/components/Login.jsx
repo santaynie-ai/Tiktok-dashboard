@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { ShieldCheck, Lock, User, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { ShieldCheck, Lock, User, ArrowRight, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 function Login({ onLogin }) {
