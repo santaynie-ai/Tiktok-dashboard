@@ -3,6 +3,7 @@ ALTER TABLE IF EXISTS profiles DISABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS sellers DISABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS search_queries DISABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS system_status DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS login_requests DISABLE ROW LEVEL SECURITY;
 
 -- 2. Tabel Profiles (User Management)
 CREATE TABLE IF NOT EXISTS profiles (
@@ -56,7 +57,7 @@ CREATE TABLE IF NOT EXISTS system_status (
 
 -- 6. Tabel Login Requests (Untuk 2FA/Approval Admin)
 CREATE TABLE IF NOT EXISTS login_requests (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     username TEXT NOT NULL,
     status TEXT DEFAULT 'pending', -- pending, approved, rejected
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

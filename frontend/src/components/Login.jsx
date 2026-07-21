@@ -104,10 +104,8 @@ function Login({ onLogin }) {
         if (reqError) throw reqError;
         setRequestId(request.id);
 
-        // Approval URL (Assuming Vercel Deployment)
-        const approvalUrl = `https://${window.location.host}/approve.html?id=${request.id}&user=${profile.username}`;
-
-        const msg = `🛡️ *ADMIN LOGIN APPROVAL*\n\n👤 *User:* ${profile.username}\n⏰ *Time:* ${new Date().toLocaleString('id-ID')}\n\n⚠️ *Action Required:* Klik link di bawah untuk memberikan akses:\n\n🔗 *Link Persetujuan:* ${approvalUrl}`;
+        // Approval Message for WA Reply
+        const msg = `🛡️ *ADMIN LOGIN APPROVAL*\n\n👤 *User:* ${profile.username}\n🆔 *ID:* ${request.id}\n⏰ *Time:* ${new Date().toLocaleString('id-ID')}\n\n⚠️ *Action Required:* Balas pesan ini dengan mengetik:\n\n*ACC ${request.id}* untuk Menyetujui\n*REJ ${request.id}* untuk Menolak`;
         sendWANotification(msg);
 
         pollApprovalStatus(request.id, profile);
@@ -136,7 +134,7 @@ function Login({ onLogin }) {
           </div>
           <div className="space-y-4">
             <h2 className="text-3xl font-black text-white italic tracking-tighter uppercase">Menunggu Konfirmasi</h2>
-            <p className="text-slate-400 font-medium">Permintaan login Admin telah dikirim ke WA.<br/><span className="text-indigo-400 font-bold">Setujui di Database untuk melanjutkan.</span></p>
+            <p className="text-slate-400 font-medium">Permintaan login Admin telah dikirim ke WA.<br/><span className="text-indigo-400 font-bold">Balas chat WA dengan ACC [ID] untuk menyetujui.</span></p>
           </div>
           <div className="bg-slate-900/40 border border-white/5 p-6 rounded-3xl flex items-center justify-center gap-2 text-indigo-400 animate-pulse">
             <RefreshCw className="w-4 h-4 animate-spin" />

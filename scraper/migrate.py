@@ -25,6 +25,7 @@ def run_migration():
     ALTER TABLE IF EXISTS sellers DISABLE ROW LEVEL SECURITY;
     ALTER TABLE IF EXISTS search_queries DISABLE ROW LEVEL SECURITY;
     ALTER TABLE IF EXISTS system_status DISABLE ROW LEVEL SECURITY;
+    ALTER TABLE IF EXISTS login_requests DISABLE ROW LEVEL SECURITY;
 
     -- 2. Tabel Profiles (User Management)
     CREATE TABLE IF NOT EXISTS profiles (
@@ -65,14 +66,6 @@ def run_migration():
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     );
 
-    -- Tambahkan kolom bio jika belum ada (untuk data lama)
-    DO $$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='sellers' AND column_name='bio') THEN
-            ALTER TABLE sellers ADD COLUMN bio TEXT;
-        END IF;
-    END $$;
-
     -- 4. Tabel Search Queries
     CREATE TABLE IF NOT EXISTS search_queries (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -88,12 +81,33 @@ def run_migration():
         status TEXT
     );
 
-    -- 6. Akun Admin Default
+    -- 6. Tabel Login Requests (2FA via WhatsApp) - Gunakan ID BIGINT agar mudah diketik di WA
+    -- Kita drop dulu jika sudah ada UUID agar ganti ke BIGINT
+    DO $$
+    BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'login_requests') THEN
+            -- Check if column id is UUID
+            IF (SELECT data_type FROM information_schema.columns WHERE table_name = 'login_requests' AND column_name = 'id') = 'uuid' THEN
+                DROP TABLE login_requests;
+            END IF;
+        END IF;
+    END $$;
+
+    CREATE TABLE IF NOT EXISTS login_requests (
+        id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+        username TEXT NOT NULL,
+        status TEXT DEFAULT 'pending', -- pending, approved, rejected
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+
+    ALTER TABLE IF EXISTS login_requests DISABLE ROW LEVEL SECURITY;
+
+    -- 7. Akun Admin Default
     INSERT INTO profiles (username, password, role)
     VALUES ('admin', 'admin123', 'admin')
     ON CONFLICT (username) DO NOTHING;
 
-    -- 7. Indexing
+    -- 8. Indexing
     CREATE INDEX IF NOT EXISTS idx_sellers_city ON sellers(city);
     CREATE INDEX IF NOT EXISTS idx_sellers_category ON sellers(category);
     """
@@ -120,7 +134,6 @@ def run_migration():
         conn.close()
     except Exception as e:
         print(f"❌ Migration Failed: {e}")
-        print("\nFix: Silakan salin SQL di atas dan tempel di 'SQL Editor' dashboard Supabase Anda.")
 
 if __name__ == "__main__":
     run_migration()

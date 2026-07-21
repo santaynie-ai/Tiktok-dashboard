@@ -17,6 +17,53 @@ class SyncScraper:
         self.wa_token = os.environ.get('WA_API_TOKEN')
         self.wa_group = os.environ.get('WA_GROUP_ID')
 
+    def check_whatsapp_approval(self):
+        """Poll GreenAPI for incoming approval messages"""
+        try:
+            # Menggunakan receiveNotification untuk mendapatkan pesan terbaru
+            url = f"{self.wa_url}/waInstance{self.wa_id}/receiveNotification/{self.wa_token}"
+            response = requests.get(url, timeout=10)
+            data = response.json()
+
+            if data and "body" in data:
+                receipt_id = data["receiptId"]
+                body = data["body"]
+
+                # Cek jika ini adalah pesan teks masuk
+                if body.get("typeWebhook") == "incomingMessageReceived":
+                    sender_data = body.get("senderData", {})
+                    message_data = body.get("messageData", {})
+                    text_message = ""
+
+                    if message_data.get("typeMessage") == "textMessage":
+                        text_message = message_data.get("textMessageData", {}).get("textMessage", "").upper()
+
+                    sender_id = sender_data.get("chatId")
+
+                    # Verifikasi apakah pengirim adalah nomor admin Anda
+                    if sender_id == self.wa_group:
+                        if "ACC" in text_message:
+                            print(f"✅ Received WhatsApp Approval from {sender_id}!")
+                            # Update latest pending request to approved
+                            SUPABASE.client.table('login_requests')\
+                                .update({'status': 'approved'})\
+                                .eq('status', 'pending')\
+                                .order('created_at', desc=True)\
+                                .limit(1).execute()
+                        elif "REJ" in text_message or "NO" in text_message:
+                            print(f"❌ Received WhatsApp Rejection from {sender_id}!")
+                            SUPABASE.client.table('login_requests')\
+                                .update({'status': 'rejected'})\
+                                .eq('status', 'pending')\
+                                .order('created_at', desc=True)\
+                                .limit(1).execute()
+
+                # Hapus notifikasi setelah diproses agar tidak dibaca ulang
+                requests.delete(f"{self.wa_url}/waInstance{self.wa_id}/deleteNotification/{self.wa_token}/{receipt_id}")
+        except Exception as e:
+            # Silent fail for listener to keep loop running
+            pass
+
     def scrape_and_save(self, page, username, category="Search Result"):
         try:
             # CHECK DUPLICATE
@@ -83,7 +130,10 @@ def run_local_search_worker():
 
         while True:
             try:
-                # Update Heartbeat
+                # 1. WhatsApp Approval Listener
+                scraper.check_whatsapp_approval()
+
+                # 2. Update Heartbeat
                 SUPABASE.client.table('system_status').upsert({'id': 'search_engine', 'last_seen': datetime.now().isoformat(), 'status': 'online'}).execute()
 
                 # Cek Antrean dari Dashboard
