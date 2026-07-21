@@ -43,25 +43,36 @@ class AcquisitionAIScraper:
             return
 
         page = await context.new_page()
-        await page.set_extra_http_headers({"Accept-Language": "en-US,en;q=0.9"})
+        await page.set_extra_http_headers({"Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7"})
 
         try:
-            self.log(f"🕵️  Scanning profile: @{username} [{category}]")
+            self.log(f"🕵️  Scanning UMKM profile: @{username} [{category}]")
             await page.goto(f"https://www.tiktok.com/@{username}", wait_until="domcontentloaded", timeout=60000)
             await page.wait_for_selector('[data-e2e="user-title"]', timeout=15000)
 
             display_name = await page.inner_text('[data-e2e="user-title"]')
             bio = await page.inner_text('[data-e2e="user-bio"]') if await page.query_selector('[data-e2e="user-bio"]') else ""
 
-            phone_match = re.search(r'(?:\+62|62|08)[0-9]{9,12}', bio.replace(" ", "").replace("-", ""))
-            phone = phone_match.group(0) if phone_match else None
+            # UMKM TARGETING: Check for Indonesian keywords in bio
+            indonesian_keywords = ['wa', '08', 'kecamatan', 'kabupaten', 'ongkir', 'cod', 'pesan', 'hubungi', 'indonesia', 'jakarta', 'bandung', 'surabaya']
+            is_indo = any(kw in bio.lower() for kw in indonesian_keywords) or any(kw in display_name.lower() for kw in indonesian_keywords)
+
+            if not is_indo:
+                self.log(f"⏩ Skipping @{username} (Not likely Indonesian UMKM)")
+                await page.close()
+                return
 
             followers_raw = await page.inner_text('[data-e2e="followers-count"]')
             followers = self.parse_count(followers_raw)
 
-            if followers < 100:
+            # UMKM FILTER: Follower 100 - 30,000 (Targeting Micro-Influencers/Small Shops)
+            if followers < 100 or followers > 30000:
+                self.log(f"⏩ Skipping @{username} ({followers} followers - Not in UMKM range)")
                 await page.close()
                 return
+
+            phone_match = re.search(r'(?:\+62|62|08)[0-9]{9,12}', bio.replace(" ", "").replace("-", ""))
+            phone = phone_match.group(0) if phone_match else None
 
             data = {
                 'platform': 'tiktok',
@@ -71,14 +82,13 @@ class AcquisitionAIScraper:
                 'phone_number': phone,
                 'category': category,
                 'city': "Indonesia",
-                'potential_score': int(min((followers / 1000) + (20 if phone else 0), 100)),
+                'potential_score': int(min((followers / 500) + (40 if phone else 0), 100)),
                 'tiktok_url': f"https://www.tiktok.com/@{username}",
                 'last_scraped': datetime.now().isoformat()
             }
 
             self.supabase.insert_seller(data)
-            if phone: self.send_notification(data)
-            self.log(f"✅ Success: @{username} ({followers} followers)")
+            self.log(f"✅ Success UMKM: @{username} ({followers} followers)")
 
         except Exception as e:
             self.log(f"❌ Error profiling @{username}: {str(e)[:50]}")
