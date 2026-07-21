@@ -13,7 +13,7 @@ function Dashboard({ user, onLogout }) {
   const [filteredSellers, setFilteredSellers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [platformFilter, setPlatformFilter] = useState('tiktok'); // Locked to TikTok
+  const [platformFilter, setPlatformFilter] = useState('all'); // Set to 'all' to show existing data
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [cityFilter, setCityFilter] = useState('all');
   const [sortBy, setSortBy] = useState('followers_count_desc');
@@ -165,7 +165,7 @@ function Dashboard({ user, onLogout }) {
 
     setFilteredSellers(result);
     setCurrentPage(1); // Reset ke halaman 1 saat filter berubah
-  }, [searchQuery, platformFilter, sortBy, sellers, user, categoryFilter]);
+  }, [searchQuery, platformFilter, sortBy, sellers, user, categoryFilter, cityFilter]);
 
   const fetchSellers = async () => {
     try {
