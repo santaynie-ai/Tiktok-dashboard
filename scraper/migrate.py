@@ -9,7 +9,6 @@ load_dotenv(env_path)
 def run_migration():
     # Database configuration
     db_password = os.getenv('Password_supabase')
-    # Using the project ref directly in host
     db_host = "db.rmyigajrfuffjlosbgdd.supabase.co"
     db_name = "postgres"
     db_user = "postgres"
@@ -19,37 +18,88 @@ def run_migration():
         print("❌ Error: Password_supabase not found in .env")
         return
 
-    # SQL for binding policy fix
+    # Full Schema for current Dashboard features
     sql_commands = """
-    -- 1. Pastikan RLS Aktif
-    ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+    -- 1. Matikan RLS agar Dashboard & Scraper bisa beroperasi dengan mudah
+    ALTER TABLE IF EXISTS profiles DISABLE ROW LEVEL SECURITY;
+    ALTER TABLE IF EXISTS sellers DISABLE ROW LEVEL SECURITY;
+    ALTER TABLE IF EXISTS search_queries DISABLE ROW LEVEL SECURITY;
+    ALTER TABLE IF EXISTS system_status DISABLE ROW LEVEL SECURITY;
 
-    -- 2. Hapus Policy Lama agar tidak duplikat
-    DROP POLICY IF EXISTS "Profiles access" ON profiles;
-    DROP POLICY IF EXISTS "Allow login" ON profiles;
-    DROP POLICY IF EXISTS "Enable login for all" ON profiles;
-    DROP POLICY IF EXISTS "Enable binding for login" ON profiles;
-    DROP POLICY IF EXISTS "Admin full access" ON profiles;
+    -- 2. Tabel Profiles (User Management)
+    CREATE TABLE IF NOT EXISTS profiles (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        auth_id UUID,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        role TEXT DEFAULT 'user',
+        is_blocked BOOLEAN DEFAULT FALSE,
+        can_view_tiktok BOOLEAN DEFAULT TRUE,
+        can_view_instagram BOOLEAN DEFAULT FALSE,
+        can_view_twitter BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
 
-    -- 3. Policy Baru: Izinkan SELECT untuk proses login (Berdasarkan Username & Password)
-    CREATE POLICY "Enable login for all" ON profiles FOR SELECT USING (true);
+    -- 3. Tabel Sellers (Data TikTok UMKM)
+    CREATE TABLE IF NOT EXISTS sellers (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        platform TEXT DEFAULT 'tiktok',
+        username TEXT UNIQUE NOT NULL,
+        display_name TEXT,
+        bio TEXT,
+        followers_count BIGINT DEFAULT 0,
+        phone_number TEXT,
+        category TEXT,
+        province TEXT DEFAULT 'Indonesia',
+        city TEXT DEFAULT 'Indonesia',
+        district TEXT,
+        subdistrict TEXT,
+        potential_score INTEGER DEFAULT 0,
+        potential_reason TEXT,
+        engagement_rate DECIMAL(5,2) DEFAULT 0,
+        video_count INTEGER DEFAULT 0,
+        is_viral BOOLEAN DEFAULT FALSE,
+        is_trending BOOLEAN DEFAULT FALSE,
+        tiktok_url TEXT,
+        last_scraped TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
 
-    -- 4. Policy Baru: Izinkan UPDATE auth_id untuk proses binding pertama kali
-    CREATE POLICY "Enable binding for login" ON profiles FOR UPDATE USING (auth_id IS NULL OR auth_id = auth.uid());
+    -- Tambahkan kolom bio jika belum ada (untuk data lama)
+    DO $$
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='sellers' AND column_name='bio') THEN
+            ALTER TABLE sellers ADD COLUMN bio TEXT;
+        END IF;
+    END $$;
 
-    -- 5. Policy Baru: Admin bisa melakukan segalanya
-    CREATE POLICY "Admin full access" ON profiles FOR ALL
-    USING ((SELECT role FROM profiles WHERE auth_id = auth.uid()) = 'admin');
+    -- 4. Tabel Search Queries
+    CREATE TABLE IF NOT EXISTS search_queries (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        query TEXT UNIQUE NOT NULL,
+        status TEXT DEFAULT 'pending',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
 
-    -- 6. Masukkan Default Admin jika belum ada
+    -- 5. Tabel System Status
+    CREATE TABLE IF NOT EXISTS system_status (
+        id TEXT PRIMARY KEY,
+        last_seen TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        status TEXT
+    );
+
+    -- 6. Akun Admin Default
     INSERT INTO profiles (username, password, role)
     VALUES ('admin', 'admin123', 'admin')
     ON CONFLICT (username) DO NOTHING;
+
+    -- 7. Indexing
+    CREATE INDEX IF NOT EXISTS idx_sellers_city ON sellers(city);
+    CREATE INDEX IF NOT EXISTS idx_sellers_category ON sellers(category);
     """
 
     try:
-        print(f"Connecting to Supabase (Host: {db_host})...")
-        # Direct connection
+        print(f"Connecting to Supabase Database...")
         conn = psycopg2.connect(
             dbname=db_name,
             user=db_user,
@@ -61,16 +111,16 @@ def run_migration():
         conn.autocommit = True
         cur = conn.cursor()
 
-        print("🔄 Applying Security Binding Policies...")
+        print("🔄 Syncing Tables with Frontend Features...")
         cur.execute(sql_commands)
 
-        print("✅ Migration Successful! Binding policies are now active.")
+        print("✅ Supabase Tables Updated Successfully!")
 
         cur.close()
         conn.close()
     except Exception as e:
-        print(f"❌ Connection Failed: {e}")
-        print("\nPossible fix: If DNS fails, you might need to use the Supabase SQL Editor manually.")
+        print(f"❌ Migration Failed: {e}")
+        print("\nFix: Silakan salin SQL di atas dan tempel di 'SQL Editor' dashboard Supabase Anda.")
 
 if __name__ == "__main__":
     run_migration()
