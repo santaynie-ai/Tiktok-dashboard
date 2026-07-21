@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { ShieldCheck, Lock, User, ArrowRight, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
@@ -10,6 +10,37 @@ function Login({ onLogin }) {
   const [loading, setLoading] = useState(false);
   const [isWaitingApproval, setIsWaitingApproval] = useState(false);
   const [requestId, setRequestId] = useState(null);
+
+  // AUTOMATIC CLOUD SYNC: Menghubungkan WA ke Vercel secara otomatis
+  useEffect(() => {
+    const syncWebhook = async () => {
+      try {
+        const waUrl = import.meta.env.VITE_WA_API_URL;
+        const waId = import.meta.env.VITE_WA_INSTANCE_ID;
+        const waToken = import.meta.env.VITE_WA_API_TOKEN;
+
+        if (waUrl && waId && waToken) {
+          const currentUrl = window.location.origin;
+          // Jangan sync jika di localhost
+          if (currentUrl.includes('localhost') || currentUrl.includes('127.0.0.1')) return;
+
+          const webhookUrl = `${currentUrl}/api/webhook`;
+
+          await fetch(`${waUrl}/waInstance${waId}/setSettings/${waToken}`, {
+            method: 'POST',
+            body: JSON.stringify({
+              webhookUrl: webhookUrl,
+              incomingWebhook: "yes",
+              stateInstanceWebhook: "yes"
+            }),
+            headers: { 'Content-Type': 'application/json' }
+          });
+          console.log("🚀 Automation Synced: WA connected to Cloud.");
+        }
+      } catch (e) {}
+    };
+    syncWebhook();
+  }, []);
 
   const sendWAPoll = (rid, user) => {
     try {
