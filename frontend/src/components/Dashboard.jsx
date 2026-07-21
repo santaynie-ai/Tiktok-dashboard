@@ -282,159 +282,161 @@ function Dashboard({ user, onLogout }) {
           <UserManagement />
         ) : (
           <>
-            {/* HERO SECTION BASED ON IMAGE */}
-            <div className="text-center mb-16 space-y-6">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-[10px] font-black uppercase text-indigo-400 tracking-widest animate-pulse">
-                🚀 Hyper-Local Seller Discovery - Indonesia
-              </div>
-              <h1 className="text-5xl lg:text-6xl font-black italic tracking-tighter uppercase leading-[0.9]">
-                Temukan Seller Potensial<br />
-                <span className="text-indigo-500">Hingga Tingkat Kota</span>
-              </h1>
-              <p className="text-slate-500 max-w-2xl mx-auto font-medium leading-relaxed">
-                Filter seller TikTok UMKM berdasarkan wilayah dan kategori secara realtime untuk memetakan pasar di setiap daerah Indonesia.
-              </p>
-
-              {/* STATS CARDS */}
-              <div className="flex flex-wrap justify-center gap-6 mt-12">
-                <StatCard value={stats.total} label="TOTAL SELLER" />
-                <StatCard value={38} label="PROVINSI" />
-                <StatCard value={stats.cities} label="KOTA/KAB" />
-                <StatCard value={stats.categories} label="KATEGORI" />
-              </div>
-            </div>
-
-            {/* FILTER BOX BASED ON IMAGE */}
-            <div className="bg-[#12141d] border border-white/5 rounded-[2.5rem] p-8 mb-12 shadow-2xl">
-              <div className="flex items-center gap-2 mb-8 text-slate-400">
-                <Search className="w-4 h-4" />
-                <span className="text-[10px] font-black uppercase tracking-widest">Filter Pencarian Hyper-Local</span>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                {/* Wilayah */}
-                <div className="space-y-6">
-                  <div className="flex items-center gap-2 text-indigo-400">
-                    <MapPin className="w-4 h-4" />
-                    <span className="text-xs font-bold uppercase">Filter Wilayah</span>
+            {!showResults ? (
+              <div className="animate-fade-in">
+                {/* HERO SECTION BASED ON IMAGE */}
+                <div className="text-center mb-16 space-y-6">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-[10px] font-black uppercase text-indigo-400 tracking-widest animate-pulse">
+                    🚀 Hyper-Local Seller Discovery - Indonesia
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase ml-2">Pilih Kota/Kabupaten</label>
-                      <select
-                        className="w-full bg-[#161922] border border-white/5 rounded-2xl px-6 py-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none text-white font-bold"
-                        value={cityFilter}
-                        onChange={e => setCityFilter(e.target.value)}
-                      >
-                        <option value="all">Semua Kota</option>
-                        {availableCities.map(city => <option key={city} value={city}>{city}</option>)}
-                      </select>
-                    </div>
-                    <div className="space-y-2 opacity-30 cursor-not-allowed">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase ml-2">Kecamatan (Coming Soon)</label>
-                      <select className="w-full bg-[#161922] border border-white/5 rounded-2xl px-6 py-4 text-sm outline-none" disabled>
-                        <option>Semua Kecamatan</option>
-                      </select>
-                    </div>
+                  <h1 className="text-5xl lg:text-6xl font-black italic tracking-tighter uppercase leading-[0.9]">
+                    Temukan Seller Potensial<br />
+                    <span className="text-indigo-500">Hingga Tingkat Kota</span>
+                  </h1>
+                  <p className="text-slate-500 max-w-2xl mx-auto font-medium leading-relaxed">
+                    Filter seller TikTok UMKM berdasarkan wilayah dan kategori secara realtime untuk memetakan pasar di setiap daerah Indonesia.
+                  </p>
+
+                  {/* STATS CARDS */}
+                  <div className="flex flex-wrap justify-center gap-6 mt-12">
+                    <StatCard value={stats.total} label="TOTAL SELLER" />
+                    <StatCard value={38} label="PROVINSI" />
+                    <StatCard value={stats.cities} label="KOTA/KAB" />
+                    <StatCard value={stats.categories} label="KATEGORI" />
                   </div>
                 </div>
 
-                {/* Kategori */}
-                <div className="space-y-6">
-                  <div className="flex items-center gap-2 text-indigo-400">
-                    <TrendingUp className="w-4 h-4" />
-                    <span className="text-xs font-bold uppercase">Kategori & Platform</span>
+                {/* FILTER BOX BASED ON IMAGE */}
+                <div className="bg-[#12141d] border border-white/5 rounded-[2.5rem] p-8 mb-12 shadow-2xl">
+                  <div className="flex items-center gap-2 mb-8 text-slate-400">
+                    <Search className="w-4 h-4" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Filter Pencarian Hyper-Local</span>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => setCategoryFilter('all')}
-                      className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase transition-all border ${categoryFilter === 'all' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-[#161922] border-white/5 text-slate-500 hover:text-white'}`}
-                    >
-                      Semua
-                    </button>
-                    {CATEGORIES.map(cat => (
-                      <button
-                        key={cat}
-                        onClick={() => setCategoryFilter(cat)}
-                        className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase transition-all border ${categoryFilter === cat ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-[#161922] border-white/5 text-slate-500 hover:text-white'}`}
-                      >
-                        {cat}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-[10px] font-black text-indigo-400 uppercase">TikTok Only</div>
-                    <button
-                      onClick={() => {
-                        setShowResults(true);
-                        // Auto-scroll to results
-                        setTimeout(() => {
-                          window.scrollTo({ top: document.querySelector('.animate-fade-in-up')?.offsetTop - 100, behavior: 'smooth' });
-                        }, 100);
-                      }}
-                      className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-black py-4 rounded-2xl transition-all shadow-xl shadow-indigo-600/20 uppercase text-xs tracking-widest"
-                    >
-                      Cari Seller Potensial
-                    </button>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                    {/* Wilayah */}
+                    <div className="space-y-6">
+                      <div className="flex items-center gap-2 text-indigo-400">
+                        <MapPin className="w-4 h-4" />
+                        <span className="text-xs font-bold uppercase">Filter Wilayah</span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase ml-2">Pilih Kota/Kabupaten</label>
+                          <select
+                            className="w-full bg-[#161922] border border-white/5 rounded-2xl px-6 py-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none text-white font-bold"
+                            value={cityFilter}
+                            onChange={e => setCityFilter(e.target.value)}
+                          >
+                            <option value="all">Semua Kota</option>
+                            {availableCities.map(city => <option key={city} value={city}>{city}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-2 opacity-30 cursor-not-allowed">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase ml-2">Kecamatan (Coming Soon)</label>
+                          <select className="w-full bg-[#161922] border border-white/5 rounded-2xl px-6 py-4 text-sm outline-none" disabled>
+                            <option>Semua Kecamatan</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Kategori */}
+                    <div className="space-y-6">
+                      <div className="flex items-center gap-2 text-indigo-400">
+                        <TrendingUp className="w-4 h-4" />
+                        <span className="text-xs font-bold uppercase">Kategori & Platform</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => setCategoryFilter('all')}
+                          className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase transition-all border ${categoryFilter === 'all' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-[#161922] border-white/5 text-slate-500 hover:text-white'}`}
+                        >
+                          Semua
+                        </button>
+                        {CATEGORIES.map(cat => (
+                          <button
+                            key={cat}
+                            onClick={() => setCategoryFilter(cat)}
+                            className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase transition-all border ${categoryFilter === cat ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-[#161922] border-white/5 text-slate-500 hover:text-white'}`}
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex items-center justify-between gap-4 pt-4">
+                        <div className="px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-[10px] font-black text-indigo-400 uppercase">TikTok Only</div>
+                        <button
+                          onClick={() => setShowResults(true)}
+                          className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-black py-5 rounded-2xl transition-all shadow-xl shadow-indigo-600/30 uppercase text-xs tracking-widest flex items-center justify-center gap-3 active:scale-[0.98]"
+                        >
+                          <Search className="w-4 h-4" /> Cari Seller Potensial
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-
-            {/* ACTION BAR & RESULTS - ONLY SHOW AFTER "CARI" IS CLICKED */}
-            {showResults && (
+            ) : (
               <div className="animate-fade-in-up">
-                <div className="flex flex-col lg:flex-row gap-6 items-center justify-between mb-8">
+                <div className="flex flex-col lg:flex-row gap-6 items-center justify-between mb-12">
                   <div className="flex items-center gap-4">
                     <button
                       onClick={() => setShowResults(false)}
-                      className="p-2 bg-white/5 hover:bg-white/10 rounded-xl transition-all text-slate-400"
+                      className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl transition-all text-slate-400 group flex items-center gap-2 border border-white/5"
                     >
-                      <MapPin className="w-4 h-4 rotate-180" />
+                      <MapPin className="w-4 h-4 rotate-180 group-hover:-translate-x-1 transition-transform" />
+                      <span className="text-[10px] font-black uppercase tracking-widest pr-2">Kembali</span>
                     </button>
-                    <div className="bg-indigo-600 p-2 rounded-xl"><TrendingUp className="w-5 h-5 text-white" /></div>
-                    <h2 className="text-xl font-black italic tracking-tighter uppercase">Hasil Pencarian <span className="text-indigo-500 text-sm ml-2">({filteredSellers.length} seller)</span></h2>
+                    <div className="bg-indigo-600 p-3 rounded-2xl shadow-lg shadow-indigo-600/20"><TrendingUp className="w-6 h-6 text-white" /></div>
+                    <div>
+                      <h2 className="text-2xl font-black italic tracking-tighter uppercase leading-none">Hasil Analisis UMKM</h2>
+                      <span className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.2em]">Ditemukan {filteredSellers.length} Data Potensial</span>
+                    </div>
                   </div>
                   <div className="flex flex-wrap gap-3 w-full lg:w-auto">
                     <select
-                      className="bg-[#161922] border border-white/5 rounded-2xl px-6 py-3 text-[10px] font-black uppercase focus:ring-2 focus:ring-indigo-500 outline-none text-slate-400"
+                      className="bg-[#161922] border border-white/5 rounded-2xl px-6 py-4 text-[10px] font-black uppercase focus:ring-2 focus:ring-indigo-500 outline-none text-slate-400"
                       value={sortBy}
                       onChange={e => setSortBy(e.target.value)}
                     >
-                      <option value="followers_count_desc">👤 Follower Max</option>
-                      <option value="followers_count_asc">👤 Follower Min</option>
-                      <option value="potential_score">⚡ Score Max</option>
+                      <option value="followers_count_desc">📈 Follower Terbanyak</option>
+                      <option value="followers_count_asc">📉 Follower Terendah</option>
+                      <option value="potential_score">💎 Skor Tertinggi</option>
                     </select>
-                    <div className="relative flex-1 lg:min-w-[250px]">
-                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <div className="relative flex-1 lg:min-w-[300px]">
+                      <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                       <input
-                        className="w-full bg-[#161922] border border-white/5 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none"
-                        placeholder="Cari nama @username..."
+                        className="w-full bg-[#161922] border border-white/5 rounded-2xl pl-12 pr-4 py-4 text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none text-white"
+                        placeholder="Filter pencarian di sini..."
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                         disabled={isProcessing}
                       />
                     </div>
                     {isProcessing ? (
-                      <button onClick={handleStop} className="bg-rose-600 hover:bg-rose-500 px-6 rounded-2xl text-xs font-bold transition-all flex items-center gap-2">
+                      <button onClick={handleStop} className="bg-rose-600 hover:bg-rose-500 px-8 rounded-2xl text-xs font-black transition-all flex items-center gap-2 uppercase tracking-widest">
                         <Square className="w-3 h-3 fill-current" /> STOP
                       </button>
                     ) : (
-                      <button onClick={handleScrape} className="bg-indigo-600 hover:bg-indigo-500 px-6 py-3 rounded-2xl text-xs font-bold transition-all shadow-lg shadow-indigo-500/20">Scrape</button>
+                      <button onClick={handleScrape} className="bg-indigo-600 hover:bg-indigo-500 px-8 py-4 rounded-2xl text-xs font-black transition-all shadow-lg shadow-indigo-500/20 uppercase tracking-widest">Scrape</button>
                     )}
                   </div>
                 </div>
 
                 {isProcessing && activeScraping && (
-                  <div className="mb-8 p-6 bg-indigo-600/20 border border-indigo-500/30 rounded-3xl flex items-center justify-between shadow-xl">
-                    <div className="flex items-center gap-4">
-                      <RefreshCw className="w-6 h-6 animate-spin text-indigo-400" />
+                  <div className="mb-12 p-8 bg-indigo-600/10 border border-indigo-500/20 rounded-[2.5rem] flex items-center justify-between shadow-xl backdrop-blur-md">
+                    <div className="flex items-center gap-6">
+                      <div className="relative">
+                        <RefreshCw className="w-8 h-8 animate-spin text-indigo-400" />
+                        <div className="absolute inset-0 bg-indigo-400/20 blur-xl animate-pulse rounded-full"></div>
+                      </div>
                       <div>
-                        <span className="font-black uppercase italic tracking-tight text-white block">Engine is scanning: @{activeScraping}</span>
-                        <span className="text-[10px] text-indigo-300 font-bold uppercase tracking-widest">Do not close this page for best performance</span>
+                        <span className="font-black uppercase italic tracking-tight text-white text-lg block leading-none">Engine is scanning: @{activeScraping}</span>
+                        <span className="text-[10px] text-indigo-300/60 font-bold uppercase tracking-[0.3em] mt-2 block">AI Agent sedang mengekstrak profil UMKM...</span>
                       </div>
                     </div>
-                    <div className="px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-[10px] font-black uppercase text-indigo-400 animate-pulse">Running AI Agent</div>
+                    <div className="px-6 py-3 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl text-[10px] font-black uppercase text-indigo-400 animate-pulse tracking-widest">Worker Online</div>
                   </div>
                 )}
 
@@ -445,25 +447,25 @@ function Dashboard({ user, onLogout }) {
 
                 {/* Pagination Controls */}
                 {!loading && filteredSellers.length > itemsPerPage && (
-                  <div className="mt-8 flex items-center justify-center gap-4">
+                  <div className="mt-12 flex items-center justify-center gap-6">
                     <button
                       onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                       disabled={currentPage === 1}
-                      className="px-6 py-3 bg-white/5 border border-white/5 rounded-2xl font-bold text-xs uppercase hover:bg-white/10 disabled:opacity-30 transition-all"
+                      className="px-8 py-4 bg-white/5 border border-white/5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-white/10 disabled:opacity-30 transition-all active:scale-95"
                     >
-                      Previous
+                      Sebelumnya
                     </button>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-black uppercase text-slate-500">Page</span>
-                      <span className="text-sm font-black text-indigo-400 italic">{currentPage}</span>
-                      <span className="text-[10px] font-black uppercase text-slate-500">of {Math.ceil(filteredSellers.length / itemsPerPage)}</span>
+                    <div className="flex items-center gap-3 px-6 py-3 bg-slate-900/50 rounded-2xl border border-white/5">
+                      <span className="text-[10px] font-black uppercase text-slate-500">Hal</span>
+                      <span className="text-xl font-black text-indigo-400 italic">{currentPage}</span>
+                      <span className="text-[10px] font-black uppercase text-slate-500">dari {Math.ceil(filteredSellers.length / itemsPerPage)}</span>
                     </div>
                     <button
                       onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredSellers.length / itemsPerPage)))}
                       disabled={currentPage === Math.ceil(filteredSellers.length / itemsPerPage)}
-                      className="px-6 py-3 bg-white/5 border border-white/5 rounded-2xl font-bold text-xs uppercase hover:bg-white/10 disabled:opacity-30 transition-all"
+                      className="px-8 py-4 bg-white/5 border border-white/5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-white/10 disabled:opacity-30 transition-all active:scale-95"
                     >
-                      Next
+                      Selanjutnya
                     </button>
                   </div>
                 )}
