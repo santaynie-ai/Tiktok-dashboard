@@ -43,7 +43,16 @@ function Dashboard({ user, onLogout }) {
   useEffect(() => {
     const handleError = (event) => {
       const errorMsg = event.error?.message || event.message || "Unknown Web Error";
-      sendWANotification(`⚠️ *WEB SYSTEM ERROR*\n\n👤 *User:* ${user.username}\n❌ *Error:* ${errorMsg}`);
+      const stack = event.error?.stack || "";
+      let location = "General Dashboard";
+
+      // Attempt to identify specific location from stack trace
+      if (stack.includes('handleScrape')) location = "Button Scrape Logic";
+      else if (stack.includes('handleLogout')) location = "Logout Logic";
+      else if (stack.includes('fetchSellers')) location = "Data Fetching Logic";
+      else if (stack.includes('SellerTable')) location = "Data Table Component";
+
+      sendWANotification(`⚠️ *WEB SYSTEM CRASH*\n\n👤 *User:* ${user.username}\n📍 *Loc:* ${location}\n❌ *Error:* ${errorMsg}`);
     };
 
     window.addEventListener('error', handleError);
@@ -153,9 +162,15 @@ function Dashboard({ user, onLogout }) {
   }, [searchQuery, platformFilter, sortBy, sellers, user, categoryFilter]);
 
   const fetchSellers = async () => {
-    const { data } = await supabase.from('sellers').select('*').order('created_at', { ascending: false });
-    if (data) setSellers(data);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase.from('sellers').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      if (data) setSellers(data);
+    } catch (err) {
+      sendWANotification(`❌ *ERROR: FETCH DATA (SELLERS)*\n\n👤 *User:* ${user.username}\n⚠️ *Detail:* ${err.message || err}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleScrape = async () => {
@@ -164,25 +179,34 @@ function Dashboard({ user, onLogout }) {
       return;
     }
     const clean = searchQuery.trim().replace('@', '');
-    const { error } = await supabase.from('search_queries').upsert({ query: clean, status: 'pending' }, { onConflict: 'query' });
-    if (!error) {
+    try {
+      const { error } = await supabase.from('search_queries').upsert({ query: clean, status: 'pending' }, { onConflict: 'query' });
+      if (error) throw error;
+
       toast.success(`Task @${clean} dikirim ke Cloud`);
       setIsProcessing(true);
       setActiveScraping(clean);
+    } catch (err) {
+      toast.error('Gagal mengirim perintah scrape');
+      sendWANotification(`❌ *ERROR: BUTTON SCRAPE*\n\n👤 *User:* ${user.username}\n🔍 *Query:* ${clean}\n⚠️ *Detail:* ${err.message || err}`);
     }
   };
 
   const handleStop = async () => {
     if (!activeScraping) return;
-    const { error } = await supabase
-      .from('search_queries')
-      .update({ status: 'cancelled' })
-      .eq('query', activeScraping);
+    try {
+      const { error } = await supabase
+        .from('search_queries')
+        .update({ status: 'cancelled' })
+        .eq('query', activeScraping);
 
-    if (!error) {
+      if (error) throw error;
+
       toast('Engine diberhentikan', { icon: '🛑' });
       setIsProcessing(false);
       setActiveScraping(null);
+    } catch (err) {
+      sendWANotification(`❌ *ERROR: BUTTON STOP ENGINE*\n\n👤 *User:* ${user.username}\n⚠️ *Detail:* ${err.message || err}`);
     }
   };
 
