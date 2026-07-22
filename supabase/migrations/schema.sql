@@ -19,18 +19,20 @@ CREATE TABLE IF NOT EXISTS profiles (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 3. Tabel Sellers (Data TikTok UMKM) - DIOPTIMALKAN (Hapus kolom tidak perlu)
+-- 3. Tabel Sellers (Data TikTok UMKM) - DIOPTIMALKAN
 DROP TABLE IF EXISTS sellers;
 CREATE TABLE sellers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     platform TEXT DEFAULT 'tiktok',
     username TEXT UNIQUE NOT NULL,
     display_name TEXT DEFAULT '',
-    bio TEXT NOT NULL, -- Wajib ada bio
+    bio TEXT NOT NULL,
     followers_count BIGINT DEFAULT 0,
     phone_number TEXT DEFAULT 'N/A',
     category TEXT DEFAULT 'General',
-    city TEXT DEFAULT 'Indonesia',
+    province TEXT DEFAULT '',
+    city TEXT DEFAULT '',
+    district TEXT DEFAULT '',
     potential_score INTEGER DEFAULT 0,
     potential_reason TEXT DEFAULT 'Analisis sedang diproses oleh AI',
     engagement_rate DECIMAL(5,2) DEFAULT 0,
@@ -68,6 +70,7 @@ INSERT INTO profiles (username, password, role)
 VALUES ('admin', 'admin123', 'admin')
 ON CONFLICT (username) DO NOTHING;
 
--- 7. Indexing
+-- 8. Indexing
 CREATE INDEX IF NOT EXISTS idx_sellers_city ON sellers(city);
 CREATE INDEX IF NOT EXISTS idx_sellers_category ON sellers(category);
+CREATE INDEX IF NOT EXISTS idx_sellers_district ON sellers(district);

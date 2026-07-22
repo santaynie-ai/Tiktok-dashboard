@@ -19,9 +19,11 @@ function Dashboard({ user, onLogout }) {
   const [platformFilter, setPlatformFilter] = useState('all'); // Set to 'all' to show existing data
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [cityFilter, setCityFilter] = useState('all');
+  const [districtFilter, setDistrictFilter] = useState('all');
   const [sortBy, setSortBy] = useState('followers_count_desc');
 
   const [availableCities, setAvailableCities] = useState([]);
+  const [availableDistricts, setAvailableDistricts] = useState([]);
   const [stats, setStats] = useState({ total: 0, cities: 0, categories: 8 });
 
   const CATEGORIES = [
@@ -155,8 +157,17 @@ function Dashboard({ user, onLogout }) {
       result = result.filter(s => s.category === categoryFilter);
     }
 
-    if (cityFilter !== 'all') {
+    // ADVANCED LOCATION FILTERING
+    if (cityFilter === 'no_location') {
+      // Only show data WITHOUT any location info
+      result = result.filter(s => !s.city && !s.district && !s.province);
+    } else if (cityFilter !== 'all') {
+      // Show data matching the city
       result = result.filter(s => s.city === cityFilter);
+    }
+
+    if (districtFilter !== 'all') {
+      result = result.filter(s => s.district === districtFilter);
     }
 
     if (searchQuery.trim()) {
@@ -178,7 +189,7 @@ function Dashboard({ user, onLogout }) {
 
     setFilteredSellers(result);
     setCurrentPage(1);
-  }, [searchQuery, sortBy, sellers, categoryFilter, cityFilter]);
+  }, [searchQuery, sortBy, sellers, categoryFilter, cityFilter, districtFilter]);
 
   const fetchSellers = async () => {
     try {
@@ -195,6 +206,7 @@ function Dashboard({ user, onLogout }) {
         });
 
         setAvailableCities([...new Set(data.map(s => s.city).filter(c => c))]);
+        setAvailableDistricts([...new Set(data.map(s => s.district).filter(d => d))]);
       }
     } catch (err) {
       sendWANotification(`❌ *ERROR: FETCH DATA (SELLERS)*\n\n👤 *User:* ${user.username}\n⚠️ *Detail:* ${err.message || err}`);
@@ -328,13 +340,20 @@ function Dashboard({ user, onLogout }) {
                             onChange={e => setCityFilter(e.target.value)}
                           >
                             <option value="all">Semua Kota</option>
+                            <option value="no_location" className="text-indigo-400">⚠️ Data Tanpa Wilayah</option>
                             {availableCities.map(city => <option key={city} value={city}>{city}</option>)}
                           </select>
                         </div>
-                        <div className="space-y-2 opacity-30 cursor-not-allowed">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase ml-2">Kecamatan (Coming Soon)</label>
-                          <select className="w-full bg-[#161922] border border-white/5 rounded-2xl px-6 py-4 text-sm outline-none" disabled>
-                            <option>Semua Kecamatan</option>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase ml-2">Pilih Kecamatan</label>
+                          <select
+                            className="w-full bg-[#161922] border border-white/5 rounded-2xl px-6 py-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none text-white font-bold"
+                            value={districtFilter}
+                            onChange={e => setDistrictFilter(e.target.value)}
+                            disabled={cityFilter === 'no_location'}
+                          >
+                            <option value="all">Semua Kecamatan</option>
+                            {availableDistricts.map(dist => <option key={dist} value={dist}>{dist}</option>)}
                           </select>
                         </div>
                       </div>
