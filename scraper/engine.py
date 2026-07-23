@@ -10,13 +10,16 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
-from playwright.sync_api import sync_playwright
 
 # 1. LOAD ENVIRONMENT
 base_dir = Path(__file__).parent.parent
 env_paths = [base_dir / 'frontend' / '.env', base_dir / '.env', Path('.env')]
 for p in env_paths:
     if p.exists(): load_dotenv(p)
+
+class Result:
+    def __init__(self, data):
+        self.data = data
 
 # 2. ROBUST SUPABASE & DB CLIENT
 class SupabaseEngine:
@@ -76,12 +79,32 @@ class TableProxy:
                 cur.execute(f"SELECT {self._columns} FROM {self.table}{where}", list(self._filters.values()))
                 desc = cur.description
                 data = [dict(zip([d[0] for d in desc], r)) for r in cur.fetchall()]
-                cur.close(); conn.close()
-                class Res: def __init__(self, d): self.data = d
-                return Res(data)
+                cur.close()
+                conn.close()
+                return Result(data)
             except Exception as e: print(f"❌ DB Error: {e}")
-        class Res: def __init__(self): self.data = []
-        return Res()
+        return Result([])
+
+    def update(self, data):
+        if self.engine.client:
+            try:
+                q = self.engine.client.table(self.table).update(data)
+                for k, v in self._filters.items(): q = q.eq(k, v)
+                return q.execute()
+            except Exception: pass
+        if self.engine.use_db:
+            try:
+                conn = psycopg2.connect(host=self.engine.db_host, database='postgres', user='postgres', password=self.engine.db_pass, port='5432')
+                conn.autocommit = True
+                cur = conn.cursor()
+                set_clause = ", ".join([f"{k} = %s" for k in data.keys()])
+                where_clause = " WHERE " + " AND ".join([f"{k} = %s" for k in self._filters.keys()])
+                cur.execute(f"UPDATE {self.table} SET {set_clause}{where_clause}", list(data.values()) + list(self._filters.values()))
+                cur.close()
+                conn.close()
+                return True
+            except Exception as e: print(f"❌ DB Update Error: {e}")
+        return None
 
     def upsert(self, data, on_conflict='username'):
         if self.engine.client:
@@ -92,11 +115,12 @@ class TableProxy:
                 conn = psycopg2.connect(host=self.engine.db_host, database='postgres', user='postgres', password=self.engine.db_pass, port='5432')
                 conn.autocommit = True
                 cur = conn.cursor()
-                cols = data.keys()
+                cols = list(data.keys())
                 query = f"INSERT INTO {self.table} ({', '.join(cols)}) VALUES ({', '.join(['%s']*len(cols))}) ON CONFLICT ({on_conflict}) DO UPDATE SET {', '.join([f'{c}=EXCLUDED.{c}' for c in cols if c != on_conflict])} RETURNING id"
-                cur.execute(query, list(data.values()))
+                cur.execute(query, [data[c] for c in cols])
                 res = cur.fetchone()[0]
-                cur.close(); conn.close()
+                cur.close()
+                conn.close()
                 return res
             except Exception as e: print(f"❌ DB Upsert Error: {e}")
         return None
@@ -115,7 +139,8 @@ def run_migrations(db_engine):
             with open(sql_file, 'r') as f:
                 content = f.read()
                 if content.strip(): cur.execute(content)
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         print("✅ Database is up to date.")
     except Exception as e: print(f"⚠️ Migration warning: {e}")
 
@@ -136,11 +161,18 @@ class TiktokEngine:
         provinces = self.db.query('provinces').select('*').execute().data
         cities = []
         if self.db.use_db:
-            conn = psycopg2.connect(host=self.db.db_host, database='postgres', user='postgres', password=self.db.db_pass, port='5432')
-            cur = conn.cursor()
-            cur.execute("SELECT c.id, c.name, c.type, p.name FROM cities c JOIN provinces p ON c.province_id = p.id")
-            cities = [{'id': r[0], 'name': r[1], 'type': r[2], 'provinces': {'name': r[3]}} for r in cur.fetchall()]
-            cur.close(); conn.close()
+            try:
+                conn = psycopg2.connect(host=self.db.db_host, database='postgres', user='postgres', password=self.db.db_pass, port='5432')
+                cur = conn.cursor()
+                cur.execute("SELECT c.id, c.name, c.type, p.name FROM cities c JOIN provinces p ON c.province_id = p.id")
+                cities = [{'id': r[0], 'name': r[1], 'type': r[2], 'provinces': {'name': r[3]}} for r in cur.fetchall()]
+                cur.close()
+                conn.close()
+            except: pass
+
+        if not cities:
+            cities = self.db.query('cities').select('*, provinces(name)').execute().data
+
         return {'provinces': provinces, 'cities': cities}
 
     async def extract_profile(self, context, username, category="General"):
@@ -187,7 +219,7 @@ class TiktokEngine:
         finally: await page.close()
 
     def check_wa(self):
-        if not self.wa['url']: return
+        if not self.wa['url'] or not self.wa['token']: return
         try:
             res = requests.get(f"{self.wa['url']}/waInstance{self.wa['id']}/receiveNotification/{self.wa['token']}", timeout=5).json()
             if res and "body" in res:
@@ -234,14 +266,20 @@ async def main_loop():
                             await search_page.goto(f"https://www.tiktok.com/search/user?q={q}")
                             await asyncio.sleep(10)
                             links = await search_page.query_selector_all('a[href*="/@"]')
-                            users = list(set([re.search(r'@([\w.]+)', await l.get_attribute('href')).group(1) for l in links if re.search(r'@([\w.]+)', await l.get_attribute('href'))]))[:15]
+                            users = []
+                            for l in links:
+                                href = await l.get_attribute('href')
+                                m = re.search(r'@([\w.]+)', href)
+                                if m: users.append(m.group(1))
+
+                            users = list(set(users))[:15]
                             await search_page.close()
                             for u in users: await engine.extract_profile(context, u, "Search")
 
                         db.query('search_queries').update({'status': 'completed'}).eq('id', tid).execute()
 
                 # 4. Random Discovery (Worker Mode)
-                if random.random() < 0.1:
+                if random.random() < 0.05:
                     cats = ["Kuliner", "Fashion", "Beauty", "Skincare"]
                     q = random.choice(["baju umkm", "makanan hits", "skincare lokal", "hijab murah"])
                     print(f"🌐 Discovery Mode: {q}")
@@ -249,12 +287,16 @@ async def main_loop():
                     await search_page.goto(f"https://www.tiktok.com/search/user?q={q}")
                     await asyncio.sleep(5)
                     links = await search_page.query_selector_all('a[href*="/@"]')
-                    users = [re.search(r'@([\w.]+)', await l.get_attribute('href')).group(1) for l in links if re.search(r'@([\w.]+)', await l.get_attribute('href'))]
+                    users = []
+                    for l in links:
+                        href = await l.get_attribute('href')
+                        m = re.search(r'@([\w.]+)', href)
+                        if m: users.append(m.group(1))
                     await search_page.close()
                     for u in users[:5]: await engine.extract_profile(context, u, random.choice(cats))
 
             except Exception as e: print(f"⚠️ Loop Error: {e}")
-            await asyncio.sleep(20)
+            await asyncio.sleep(15)
 
 if __name__ == "__main__":
     asyncio.run(main_loop())
