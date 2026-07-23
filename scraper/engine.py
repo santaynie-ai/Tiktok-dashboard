@@ -25,23 +25,32 @@ class Result:
 class SupabaseEngine:
     def __init__(self):
         self.url = os.environ.get('VITE_SUPABASE_URL')
-        self.key = os.environ.get('SUPABASE_SERVICE_KEY') or os.environ.get('VITE_SUPABASE_ANON_KEY')
+        self.anon_key = os.environ.get('VITE_SUPABASE_ANON_KEY')
+        self.service_key = os.environ.get('SUPABASE_SERVICE_KEY')
         self.db_pass = os.environ.get('PASSWORD_SUPABASE')
         self.client = None
         self.use_db = False
 
         if self.db_pass and self.url:
-            self.db_host = f"db.{self.url.split('//')[1].split('.')[0]}.supabase.co"
+            project_ref = self.url.split('//')[1].split('.')[0]
+            self.db_host = f"db.{project_ref}.supabase.co"
             self.use_db = True
 
-        try:
-            from supabase import create_client
-            self.client = create_client(self.url, self.key)
-            self.client.table('system_status').select('id').limit(1).execute()
-            print("✅ REST API Active")
-        except Exception:
-            print("⚠️ REST API Failed. Using Direct DB.")
-            self.client = None
+        from supabase import create_client
+        # Try Service Key first if it looks valid
+        keys_to_try = [self.service_key, self.anon_key]
+        for k in keys_to_try:
+            if not k or len(k.split('.')) != 3: continue
+            try:
+                self.client = create_client(self.url, k)
+                self.client.table('system_status').select('id').limit(1).execute()
+                print(f"✅ Supabase REST API connected ({'service' if k == self.service_key else 'anon'} key)")
+                break
+            except Exception:
+                self.client = None
+
+        if not self.client:
+            print("⚠️ All REST API keys failed. Using Direct DB Fallback.")
 
     def query(self, table):
         return TableProxy(self, table)
