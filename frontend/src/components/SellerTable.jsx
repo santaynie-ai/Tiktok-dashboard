@@ -66,8 +66,8 @@ function SellerTable({ sellers, loading }) {
                         </div>
 
                         <div className="mt-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest leading-relaxed flex items-center gap-2">
-                          {seller.city || 'No Location'}
-                          {seller.district && <span className="text-slate-700"> / {seller.district}</span>}
+                          {seller.city || seller.province || 'No Location'}
+                          {seller.city && seller.province && <span className="text-slate-700"> / {seller.province}</span>}
                           <div className="w-1 h-1 bg-slate-700 rounded-full"></div>
                           <span className="text-indigo-400">{seller.followers_count?.toLocaleString() || 0} followers</span>
                         </div>
@@ -135,9 +135,10 @@ function SellerTable({ sellers, loading }) {
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-12">
+                        <div className="grid grid-cols-2 md:grid-cols-6 gap-12">
                           <StatItem label="FOLLOWERS" value={seller.followers_count?.toLocaleString()} />
                           <StatItem label="POTENSI SCORE" value={`${seller.potential_score}/100`} color="text-indigo-400" />
+                          <StatItem label="PROVINSI" value={seller.province || '-'} color="text-white" />
                           <StatItem label="KOTA/KAB" value={seller.city || '-'} color="text-white" />
                           <StatItem label="KECAMATAN" value={seller.district || '-'} color="text-white" />
                           <StatItem label="TGL UPDATE" value={new Date(seller.last_scraped).toLocaleDateString()} />

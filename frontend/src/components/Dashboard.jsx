@@ -16,12 +16,14 @@ function Dashboard({ user, onLogout }) {
   const [filteredSellers, setFilteredSellers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [platformFilter, setPlatformFilter] = useState('all'); // Set to 'all' to show existing data
+  const [platformFilter, setPlatformFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [provinceFilter, setProvinceFilter] = useState('all');
   const [cityFilter, setCityFilter] = useState('all');
   const [districtFilter, setDistrictFilter] = useState('all');
   const [sortBy, setSortBy] = useState('followers_count_desc');
 
+  const [availableProvinces, setAvailableProvinces] = useState([]);
   const [availableCities, setAvailableCities] = useState([]);
   const [availableDistricts, setAvailableDistricts] = useState([]);
   const [stats, setStats] = useState({ total: 0, cities: 0, categories: 8 });
@@ -159,11 +161,14 @@ function Dashboard({ user, onLogout }) {
 
     // ADVANCED LOCATION FILTERING
     if (cityFilter === 'no_location') {
-      // Only show data WITHOUT any location info
       result = result.filter(s => !s.city && !s.district && !s.province);
-    } else if (cityFilter !== 'all') {
-      // Show data matching the city
-      result = result.filter(s => s.city === cityFilter);
+    } else {
+      if (provinceFilter !== 'all') {
+        result = result.filter(s => s.province === provinceFilter);
+      }
+      if (cityFilter !== 'all') {
+        result = result.filter(s => s.city === cityFilter);
+      }
     }
 
     if (districtFilter !== 'all') {
@@ -205,6 +210,7 @@ function Dashboard({ user, onLogout }) {
           categories: 8
         });
 
+        setAvailableProvinces([...new Set(data.map(s => s.province).filter(p => p))]);
         setAvailableCities([...new Set(data.map(s => s.city).filter(c => c))]);
         setAvailableDistricts([...new Set(data.map(s => s.district).filter(d => d))]);
       }
@@ -331,9 +337,23 @@ function Dashboard({ user, onLogout }) {
                         <MapPin className="w-4 h-4" />
                         <span className="text-xs font-bold uppercase">Filter Wilayah</span>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase ml-2">Pilih Kota/Kabupaten</label>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase ml-2">Provinsi</label>
+                          <select
+                            className="w-full bg-[#161922] border border-white/5 rounded-2xl px-6 py-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none text-white font-bold"
+                            value={provinceFilter}
+                            onChange={e => {
+                                setProvinceFilter(e.target.value);
+                                setCityFilter('all');
+                            }}
+                          >
+                            <option value="all">Semua Provinsi</option>
+                            {availableProvinces.map(p => <option key={p} value={p}>{p}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase ml-2">Kota/Kabupaten</label>
                           <select
                             className="w-full bg-[#161922] border border-white/5 rounded-2xl px-6 py-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none text-white font-bold"
                             value={cityFilter}
@@ -341,11 +361,15 @@ function Dashboard({ user, onLogout }) {
                           >
                             <option value="all">Semua Kota</option>
                             <option value="no_location" className="text-indigo-400">⚠️ Data Tanpa Wilayah</option>
-                            {availableCities.map(city => <option key={city} value={city}>{city}</option>)}
+                            {availableCities.filter(c => {
+                                if (provinceFilter === 'all') return true;
+                                const seller = sellers.find(s => s.city === c);
+                                return seller?.province === provinceFilter;
+                            }).map(city => <option key={city} value={city}>{city}</option>)}
                           </select>
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase ml-2">Pilih Kecamatan</label>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase ml-2">Kecamatan</label>
                           <select
                             className="w-full bg-[#161922] border border-white/5 rounded-2xl px-6 py-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none text-white font-bold"
                             value={districtFilter}
